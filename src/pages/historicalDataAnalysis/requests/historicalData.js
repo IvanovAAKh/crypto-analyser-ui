@@ -29,10 +29,6 @@ const getBinanceHistoricalData = ({
   symbol,
   startTime,
 }) => {
-  const {
-    CRYPTO_ANALYSER,
-  } = config;
-
   return axios.get(
     `https://api.binance.com/api/v3/klines`,
     {
@@ -65,7 +61,7 @@ const fetchHistoricalData = ({
 };
 
 const fetchBinanceHistoricalData = ({
-  aggregateInMinutes=1,
+  aggregateInMinutes = 1,
   currencyFrom,
   currencyTo,
   onFailed = () => {},
@@ -106,13 +102,6 @@ const fetchBinanceHistoricalData = ({
       onSuccess(combinedResponses);
     })
     .catch((error) => onFailed(error))
-
-  // return getBinanceHistoricalData({
-  //   aggregateInMinutes,
-  //   timestampFrom,
-  //   timestampTo,
-  // }).then(response => onSuccess(response))
-  //   .catch(error => onFailed(error));
 };
 
 export default {

@@ -3,18 +3,7 @@ import Highstock from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
 
 import requestsHistoricalData from '../requests/historicalData';
-
-const historicalDataBEtoUI = (response) => {
-  const list = response.list.map(item => ({
-    high: item.high,
-    close: item.close,
-    low: item.low,
-    open: item.open,
-    timestamp: item.timestamp * 1000,
-  }));
-
-  return list;
-};
+import useLocationSearch from 'misc/hooks/useLocationSearch';
 
 const historicalDataBinanceToUI = (response) => {
   const list = response.map(([timestamp, open, high, low, close]) => ({
@@ -26,13 +15,6 @@ const historicalDataBinanceToUI = (response) => {
   }));
   console.log(list);
   return list;
-};
-
-const minMaxTimestampBEtoUI = (response) => {
-  return {
-    min: response.collectionMetadata.timestamp.min,
-    max: response.collectionMetadata.timestamp.max,
-  };
 };
 
 const TIME_MEASURES = {
@@ -64,46 +46,22 @@ const getTimestampBefore = ({
 
 function HistoricalData() {
   const containerRef = useRef(null);
+  const locationSearch = useLocationSearch();
+
   const [historicalData, setHistoricalData] = useState({
     errorMsg: '',
     isFailed: false,
     isFetching: false,
     list: null,
   });
-  const [timestampMinMax, setTimestampMinMax] = useState({
-    errorMsg: '',
-    isFailed: false,
-    isFetching: false,
-    minMax: null,
-  });
 
-  const fetchHistoricalData = ({
-    aggregateInMinutes,
-    timestampFrom,
-    timestampTo,
-  }) => {
-    requestsHistoricalData.fetchHistoricalData({
-      aggregateInMinutes: 1,
-      onFailed: (error) => setHistoricalData({
-        ...historicalData,
-        errorMsg: error,
-        isFailed: true,
-        isFetching: false,
-      }),
-      onRequest: () => setHistoricalData({
-        ...historicalData,
-        isFailed: false,
-        isFetching: true,
-      }),
-      onSuccess: (response) => setHistoricalData({
-        ...historicalData,
-        isFetching: false,
-        list: historicalDataBEtoUI(response),
-      }),
-      timestampFrom,
-      timestampTo,
-    });
-  };
+  const [historicalDataParams, setHistoricalDataParams] = useState({
+    currencyFrom: locationSearch.curF,
+    currencyTo: locationSearch.curT,
+    timeMeasure: locationSearch.timeMeasure,
+    timeValue: locationSearch.timeVal,
+    roundRatio: locationSearch.roundRatio,
+  });
 
   const fetchBinanceHistoricalData = ({
     aggregateInMinutes,
@@ -137,29 +95,6 @@ function HistoricalData() {
     });
   };
 
-  const fetchTimestampMinMax = () => {
-    requestsHistoricalData.fetchHistoricalData({
-      onFailed: (error) => setTimestampMinMax({
-        ...timestampMinMax,
-        errorMsg: error,
-        isFailed: true,
-        isFetching: false,
-      }),
-      onRequest: () => setTimestampMinMax({
-        ...timestampMinMax,
-        isFailed: false,
-        isFetching: true,
-      }),
-      onSuccess: response => setTimestampMinMax({
-        ...timestampMinMax,
-        isFetching: false,
-        minMax: minMaxTimestampBEtoUI(response),
-      }),
-      timestampFrom: 0,
-      timestampTo: 0,
-    });
-  };
-
   const chart = useMemo(() => {
     if (!historicalData.list) {
       return null;
@@ -172,8 +107,33 @@ function HistoricalData() {
         buttons: [
           {
             type: 'hour',
+            count: 0.5,
+            text: '30m',
+          },
+          {
+            type: 'hour',
             count: 1,
             text: '1h'
+          },
+          {
+            type: 'hour',
+            count: 2,
+            text: '2h'
+          },
+          {
+            type: 'hour',
+            count: 3,
+            text: '3h'
+          },
+          {
+            type: 'hour',
+            count: 4,
+            text: '4h'
+          },
+          {
+            type: 'hour',
+            count: 5,
+            text: '5h'
           },
           {
             type: 'hour',
@@ -222,27 +182,26 @@ function HistoricalData() {
             hour: '2-digit',
             minute: '2-digit',
           });
-          const difference = Math.abs(this.point.close - this.point.open).toFixed(2);
+          const difference = Math.abs(this.point.close - this.point.open).toFixed(historicalDataParams.roundRatio);
           const differenceStr = `<span style="color:${this.point.color}"><b>${difference}</b></span>`;
           return '' +
             `<span style="color:${this.point.color}"> ● </span>` +
             `<b>${formattedDate}</b>` +
             '<br/>' +
-            `<br/>Open: <b>${Number(this.point.open.toFixed(0)).toLocaleString('ru-RU')}</b>` +
-            `<br/>Close: <b>${Number(this.point.close.toFixed(0)).toLocaleString('ru-RU')}</b>` +
+            `<br/>Open: <b>${Number(this.point.open.toFixed(historicalDataParams.roundRatio)).toLocaleString('ru-RU')}</b>` +
+            `<br/>Close: <b>${Number(this.point.close.toFixed(historicalDataParams.roundRatio)).toLocaleString('ru-RU')}</b>` +
             '<br/>' +
             '<br/>Difference: ' + differenceStr;
         },
       },
       navigator: {
-        series: {
-          color: '#000000'
-        }
+        enabled: false,
       },
       xAxis: {
         overscroll: 500000,
         range: 4 * 200000,
-        gridLineWidth: 1
+        gridLineWidth: 1,
+        ordinal: false,
       },
       yAxis: {
         alignTicks: true,
@@ -251,7 +210,7 @@ function HistoricalData() {
           label: {
             backgroundColor: '#00b0ff',
             enabled: true,
-            format: '{value:.0f}',
+            format: `{value:.${historicalDataParams.roundRatio}f}`,
             style: {
               fontWeight: 'bold',
               fontSize: '14px',
@@ -282,7 +241,8 @@ function HistoricalData() {
             ],
           },
           grouping: true,
-          lineWidth: 0.2,
+          groupPadding: 0,
+          lineWidth: 0.3,
           tooltip: {
             distance: 20,
           },
@@ -296,44 +256,58 @@ function HistoricalData() {
           ])),
           color: '#FF7F7F',
           upColor: '#00d22d',
+          yAxis: 0,
         },
+        {
+          type: 'line',
+          states: {
+            inactive: {
+              opacity: 1
+            },
+            hover: {
+              enabled: false // Отключает эффект при наведении
+            }
+          },
+          data: [
+            [1727437680000, 1.7067],
+            [1727605800000, 1.678],
+          ],
+          enableMouseTracking: false, // Отключает наведение
+          showInLegend: false, // Убирает из легенды
+          events: {
+            legendItemClick: function() {
+              return false; // Отключает клик в легенде (если она все же отображается)
+            }
+          },
+          marker: {
+            enabled: false // Отключает маркеры точек
+          }
+        }
       ],
     };
   }, [historicalData.list]);
 
   useEffect(() => {
-    if (timestampMinMax.minMax
-      && !timestampMinMax.isFetching
-      && !timestampMinMax.isFailed
-    ) {
-      fetchHistoricalData({
-        aggregateInMinutes: 1,
-        timestampFrom: getTimestampBefore({
-          currentTimestamp: timestampMinMax.minMax.max,
-          timeMeasure: TIME_MEASURES.months,
-          value: 4,
-        }),
-        timestampTo:timestampMinMax.minMax.max,
-      });
-    }
-  }, [timestampMinMax]);
-
-  useEffect(() => {
-    // fetchTimestampMinMax();
     const timestampTo = Date.now();
+    console.log('REQUEST_----------------');
     fetchBinanceHistoricalData({
       aggregateInMinutes: 1,
-      currencyFrom: 'BTC',
-      currencyTo: 'USDT',
+      currencyFrom: historicalDataParams.currencyFrom,
+      currencyTo: historicalDataParams.currencyTo,
       timestampTo,
       timestampFrom: getTimestampBefore({
         currentTimestamp: timestampTo,
-        timeMeasure: TIME_MEASURES.days,
-        value: 14,
+        timeMeasure: historicalDataParams.timeMeasure,
+        value: historicalDataParams.timeValue,
         withMillis: true,
       }),
     });
-  }, []);
+  }, [
+    historicalDataParams.currencyFrom,
+    historicalDataParams.currencyTo,
+    historicalDataParams.timeMeasure,
+    historicalDataParams.timeValue,
+  ]);
 
   return (
     <div
