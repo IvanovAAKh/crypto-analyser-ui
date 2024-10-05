@@ -1,9 +1,30 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
+import { createUseStyles } from 'react-jss';
 import Highstock from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
 
 import requestsHistoricalData from '../requests/historicalData';
 import useLocationSearch from 'misc/hooks/useLocationSearch';
+import useTheme from 'misc/hooks/useTheme';
+import Typography from 'components/Typography';
+
+const getClasses = createUseStyles((theme) => ({
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: `${theme.spacing(2)}px`,
+    height: '100%',
+  },
+  input: {
+    width: '300px',
+  }
+}));
+
+const pointColors = {
+  positive: '#00d22d',
+  negative: '#FF7F7F',
+  selected: '#0000FF',
+};
 
 const historicalDataBinanceToUI = (response) => {
   const list = response.map(([timestamp, open, high, low, close]) => ({
@@ -13,7 +34,6 @@ const historicalDataBinanceToUI = (response) => {
     open: Number(open),
     timestamp,
   }));
-  console.log(list);
   return list;
 };
 
@@ -46,6 +66,9 @@ const getTimestampBefore = ({
 
 function HistoricalData() {
   const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const { theme } = useTheme();
+  const classes = getClasses({ theme });
   const locationSearch = useLocationSearch();
 
   const [historicalData, setHistoricalData] = useState({
@@ -61,6 +84,11 @@ function HistoricalData() {
     timeMeasure: locationSearch.timeMeasure,
     timeValue: locationSearch.timeVal,
     roundRatio: locationSearch.roundRatio,
+  });
+
+  const [state, setState] = useState({
+    componentDidMount: false,
+    selectedPoints: [],
   });
 
   const fetchBinanceHistoricalData = ({
@@ -80,11 +108,17 @@ function HistoricalData() {
         isFailed: true,
         isFetching: false,
       }),
-      onRequest: () => setHistoricalData({
-        ...historicalData,
-        isFailed: false,
-        isFetching: true,
-      }),
+      onRequest: () => {
+        setHistoricalData({
+          ...historicalData,
+          isFailed: false,
+          isFetching: true,
+        });
+        setState({
+          ...state,
+          selectedPoints: [],
+        });
+      },
       onSuccess: (response) => setHistoricalData({
         ...historicalData,
         isFetching: false,
@@ -95,13 +129,47 @@ function HistoricalData() {
     });
   };
 
+  const onClickPoint = (inputPoint) => {
+    setState((prevState) => {
+      const selectedPointIds = prevState.selectedPoints.map(point => point.x);
+      let pointsToRemove = [];
+      let newSelectedPoints = [];
+      if (selectedPointIds.includes(inputPoint.x)) {
+        newSelectedPoints = prevState.selectedPoints
+          .filter(point => point.x !== inputPoint.x);
+        pointsToRemove.push(inputPoint);
+      } else if (prevState.selectedPoints.length < 2) {
+        newSelectedPoints = prevState.selectedPoints.concat(inputPoint);
+      } else {
+        pointsToRemove = [...prevState.selectedPoints];
+        newSelectedPoints = [inputPoint];
+      }
+      newSelectedPoints.forEach(point => {
+        point.update({
+          color: 'blue',
+        });
+      });
+      pointsToRemove.forEach(point => {
+        point.update({
+          color: point.options.open < point.options.close
+            ? pointColors.negative
+            : pointColors.positive,
+        });
+      });
+      return ({
+        ...prevState,
+        selectedPoints: newSelectedPoints,
+      });
+    });
+  };
+
   const chart = useMemo(() => {
-    if (!historicalData.list) {
+    if (!state.componentDidMount) {
       return null;
     }
     return {
       chart: {
-        height: containerRef.current.getBoundingClientRect().height,
+        height: containerRef.current?.getBoundingClientRect().height,
       },
       rangeSelector: {
         buttons: [
@@ -232,13 +300,13 @@ function HistoricalData() {
           animation: false,
           crisp: false,
           dataGrouping: {
-            enabled: true,
-            units: [
-              [
-                'minute',
-                [1],
-              ],
-            ],
+            enabled: false,
+            // units: [
+            //   [
+            //     'minute',
+            //     [1],
+            //   ],
+            // ],
           },
           grouping: true,
           groupPadding: 0,
@@ -247,19 +315,21 @@ function HistoricalData() {
             distance: 20,
           },
           type: 'candlestick',
-          data: historicalData.list.map(item => ([
-            item.timestamp,
-            item.open,
-            item.high,
-            item.low,
-            item.close,
-          ])),
-          color: '#FF7F7F',
-          upColor: '#00d22d',
-          yAxis: 0,
+          color: pointColors.negative,
+          upColor: pointColors.positive,
+          point: {
+            events: {
+              click: function(e) {
+                onClickPoint(this);
+              }
+            },
+          },
         },
         {
           type: 'line',
+          dataGrouping: {
+            enabled: false,
+          },
           states: {
             inactive: {
               opacity: 1
@@ -268,10 +338,6 @@ function HistoricalData() {
               enabled: false // Отключает эффект при наведении
             }
           },
-          data: [
-            [1727437680000, 1.7067],
-            [1727605800000, 1.678],
-          ],
           enableMouseTracking: false, // Отключает наведение
           showInLegend: false, // Убирает из легенды
           events: {
@@ -285,11 +351,43 @@ function HistoricalData() {
         }
       ],
     };
+  }, [state.componentDidMount]);
+
+  const historicalChartData = useMemo(() => {
+    if (!historicalData.list) {
+      return null;
+    }
+    return historicalData.list.map(item => ([
+      item.timestamp,
+      item.open,
+      item.high,
+      item.low,
+      item.close,
+    ]));
   }, [historicalData.list]);
+
+  const lineChartData = useMemo(() => {
+    return state.selectedPoints.map((p) => [p.x, p.y]);
+  }, [state.selectedPoints]);
+
+  useEffect(() => {
+    if (state.componentDidMount && historicalChartData) {
+      const chart = chartRef.current.chart;
+      const series = chart.series[0];
+      series.setData(historicalChartData, true);
+    }
+  }, [historicalChartData, state.componentDidMount]);
+
+  useEffect(() => {
+    if (state.componentDidMount) {
+      const chart = chartRef.current.chart;
+      const series = chart.series[1];
+      series.setData(lineChartData, true);
+    }
+  }, [lineChartData, state.componentDidMount]);
 
   useEffect(() => {
     const timestampTo = Date.now();
-    console.log('REQUEST_----------------');
     fetchBinanceHistoricalData({
       aggregateInMinutes: 1,
       currencyFrom: historicalDataParams.currencyFrom,
@@ -309,20 +407,33 @@ function HistoricalData() {
     historicalDataParams.timeValue,
   ]);
 
+  useEffect(() => {
+    setState({
+      ...state,
+      componentDidMount: true,
+    });
+  }, []);
+
   return (
-    <div
-      style={{
-        height: '100%',
-      }}
-      ref={containerRef}
-    >
-      {chart && (
-        <HighchartsReact
-          constructorType="stockChart"
-          highcharts={Highstock}
-          options={chart}
-        />
-      )}
+    <div className={classes.container}>
+      <Typography>
+        {`Selected points: ${state.selectedPoints.join(', ')}`}
+      </Typography>
+      <div
+        style={{
+          height: '100%',
+        }}
+        ref={containerRef}
+      >
+        {chart && (
+          <HighchartsReact
+            constructorType="stockChart"
+            highcharts={Highstock}
+            options={chart}
+            ref={chartRef}
+          />
+        )}
+      </div>
     </div>
   );
 }
