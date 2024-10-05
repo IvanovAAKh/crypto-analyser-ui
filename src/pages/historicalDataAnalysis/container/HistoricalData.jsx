@@ -6,9 +6,10 @@ import HighchartsReact from 'highcharts-react-official';
 import requestsHistoricalData from '../requests/historicalData';
 import useLocationSearch from 'misc/hooks/useLocationSearch';
 import useTheme from 'misc/hooks/useTheme';
-import Typography from 'components/Typography';
+import Button from 'components/Button';
 
 import dataUtils from '../utils/data';
+import trendUtils from '../utils/trend';
 
 const getClasses = createUseStyles((theme) => ({
   container: {
@@ -119,14 +120,14 @@ const buildTrendParams = ({
     timestampFrom: xStart,
     timestampTo: xEnd,
   });
-  let yStart = 0;
-  let yEnd = 9999999;
+  let yStart = 999999;
+  let yEnd = 0;
   selectedInterval.forEach(item => {
-    if (item.low < yEnd) {
-      yEnd = item.low;
+    if (item.low < yStart) {
+      yStart = item.low;
     }
-    if (item.high > yStart) {
-      yStart = item.high;
+    if (item.high > yEnd) {
+      yEnd = item.high;
     }
   });
   return {
@@ -157,7 +158,6 @@ const buildHistoricalChartSeries = ({
 const buildRectangleChartSeries = ({
   trendParams,
 }) => {
-  console.log(trendParams);
   if (!trendParams) {
     return [];
   }
@@ -182,7 +182,10 @@ const buildTrendChartSeries = ({
   if (!trend) {
     return [];
   }
-  return [];
+  return [
+    [trend.xStart, trend.yStart],
+    [trend.xEnd, trend.yEnd],
+  ];
 };
 
 function HistoricalData() {
@@ -283,6 +286,30 @@ function HistoricalData() {
         ...prevState,
         selectedPoints: newSelectedPoints,
       });
+    });
+  };
+
+  const calculateTrend = () => {
+    const {
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
+    } = state.trendParams;
+    const trend = trendUtils.calculateTrend({
+      data: dataUtils.getDataInterval({
+        data: historicalData.list,
+        timestampFrom: xStart,
+        timestampTo: xEnd,
+      }),
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
+    });
+    setState({
+      ...state,
+      trend,
     });
   };
 
@@ -532,6 +559,7 @@ function HistoricalData() {
     setState({
       ...state,
       trendParams,
+      trend: null,
     });
   }, [state.selectedPoints]);
 
@@ -592,9 +620,21 @@ function HistoricalData() {
 
   return (
     <div className={classes.container}>
-      <Typography>
-        {`Selected points: ${state.selectedPoints.join(', ')}`}
-      </Typography>
+      <div className={classes.input}>
+        <Button
+          disabled={!state.trendParams}
+          onClick={calculateTrend}
+        >
+          Calculate Trend
+        </Button>
+      </div>
+      <div>
+        {state.trend && (
+          <div>
+            {`Confidence: ${state.trend.confidencePercent.toFixed(2)}%`}
+          </div>
+        )}
+      </div>
       <div
         style={{
           height: '100%',

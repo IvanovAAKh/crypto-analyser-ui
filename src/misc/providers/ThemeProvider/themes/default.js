@@ -1,6 +1,6 @@
 const commonColors = {
   text: {
-    primary: '#027f0b',
+    primary: '#2d2d2b',
     primaryContrast: '#fffefa',
     primaryHeader: '#16bb00',
     secondary: '#60a374',
