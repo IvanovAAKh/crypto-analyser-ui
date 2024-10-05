@@ -8,6 +8,8 @@ import useLocationSearch from 'misc/hooks/useLocationSearch';
 import useTheme from 'misc/hooks/useTheme';
 import Typography from 'components/Typography';
 
+import dataUtils from '../utils/data';
+
 const getClasses = createUseStyles((theme) => ({
   container: {
     display: 'flex',
@@ -53,6 +55,22 @@ const minutesConvertersToTimeMeasures = {
   [TIME_MEASURES.months]: months => months * 60 * 24 * 31,
 };
 
+const historicalDataFields = {
+  close: 'close',
+  high: 'high',
+  low: 'low',
+  open: 'open',
+  timestamp: 'timestamp',
+};
+
+const historicalDataIndexesToFields = {
+  [historicalDataFields.close]: 4,
+  [historicalDataFields.high]: 2,
+  [historicalDataFields.low]: 3,
+  [historicalDataFields.open]: 1,
+  [historicalDataFields.timestamp]: 0,
+};
+
 const getTimestampBefore = ({
   currentTimestamp,
   timeMeasure,
@@ -62,6 +80,109 @@ const getTimestampBefore = ({
   const converter = minutesConvertersToTimeMeasures[timeMeasure];
   const minutesBefore = converter(value);
   return currentTimestamp - minutesBefore * 60 * (withMillis ? 1000: 1);
+};
+
+const updateChartHistoricalSeries = ({
+  chart,
+  series: newSeries,
+}) => {
+  const series = chart.series[0];
+  series.setData(newSeries, true);
+};
+
+const updateChartRectangleSeries = ({
+  chart,
+  series: newSeries,
+}) => {
+  const series = chart.series[1];
+  series.setData(newSeries, true);
+};
+
+const updateChartTrendSeries = ({
+  chart,
+  series: newSeries,
+}) => {
+  const series = chart.series[2];
+  series.setData(newSeries, true);
+};
+
+const buildTrendParams = ({
+  selectedPoints,
+  historicalData,
+}) => {
+  const orderedSelectedPoints = selectedPoints
+    .sort((pointA, pointB) => pointA.x - pointB.x);
+  const xStart = orderedSelectedPoints[0].x;
+  const xEnd = orderedSelectedPoints[1].x;
+  const selectedInterval = dataUtils.getDataInterval({
+    data: historicalData,
+    timestampFrom: xStart,
+    timestampTo: xEnd,
+  });
+  let yStart = 0;
+  let yEnd = 9999999;
+  selectedInterval.forEach(item => {
+    if (item.low < yEnd) {
+      yEnd = item.low;
+    }
+    if (item.high > yStart) {
+      yStart = item.high;
+    }
+  });
+  return {
+    xStart,
+    xEnd,
+    yStart,
+    yEnd,
+  };
+};
+
+const buildHistoricalChartSeries = ({
+  historicalData,
+}) => {
+  if (!historicalData) {
+    return [];
+  }
+  return historicalData.map(item => {
+    const result = [];
+    Object
+      .values(historicalDataFields)
+      .forEach(field => {
+        result[historicalDataIndexesToFields[field]] = item[field];
+      });
+    return result;
+  });
+};
+
+const buildRectangleChartSeries = ({
+  trendParams,
+}) => {
+  console.log(trendParams);
+  if (!trendParams) {
+    return [];
+  }
+  const {
+    xStart,
+    xEnd,
+    yStart,
+    yEnd,
+  } = trendParams;
+  return [
+    [xStart, yStart],
+    [xStart, yEnd],
+    [xEnd, yEnd],
+    [xEnd, yStart],
+    [xStart, yStart],
+  ];
+};
+
+const buildTrendChartSeries = ({
+  trend,
+}) => {
+  if (!trend) {
+    return [];
+  }
+  return [];
 };
 
 function HistoricalData() {
@@ -89,6 +210,8 @@ function HistoricalData() {
   const [state, setState] = useState({
     componentDidMount: false,
     selectedPoints: [],
+    trendParams: null,
+    trend: null,
   });
 
   const fetchBinanceHistoricalData = ({
@@ -348,43 +471,96 @@ function HistoricalData() {
           marker: {
             enabled: false // Отключает маркеры точек
           }
-        }
+        },
+        {
+          type: 'line',
+          dataGrouping: {
+            enabled: false,
+          },
+          states: {
+            inactive: {
+              opacity: 1
+            },
+            hover: {
+              enabled: false // Отключает эффект при наведении
+            }
+          },
+          enableMouseTracking: false, // Отключает наведение
+          showInLegend: false, // Убирает из легенды
+          events: {
+            legendItemClick: function() {
+              return false; // Отключает клик в легенде (если она все же отображается)
+            }
+          },
+          marker: {
+            enabled: false // Отключает маркеры точек
+          }
+        },
       ],
     };
   }, [state.componentDidMount]);
 
-  const historicalChartData = useMemo(() => {
-    if (!historicalData.list) {
-      return null;
-    }
-    return historicalData.list.map(item => ([
-      item.timestamp,
-      item.open,
-      item.high,
-      item.low,
-      item.close,
-    ]));
-  }, [historicalData.list]);
+  const historicalChartSeries = useMemo(
+    () =>  buildHistoricalChartSeries({
+      historicalData: historicalData.list,
+    }),
+    [historicalData.list],
+  );
 
-  const lineChartData = useMemo(() => {
-    return state.selectedPoints.map((p) => [p.x, p.y]);
+  const trendChartSeries = useMemo(
+    () => buildTrendChartSeries({
+      trend: state.trend,
+    }),
+    [state.trend],
+  );
+
+  const rectangleChartSeries = useMemo(
+    () => buildRectangleChartSeries({
+      trendParams: state.trendParams,
+    }),
+    [state.trendParams],
+  );
+
+  useEffect(() => {
+    let trendParams = null;
+    if (state.selectedPoints.length === 2) {
+      trendParams = buildTrendParams({
+        selectedPoints: state.selectedPoints,
+        historicalData: historicalData.list,
+      });
+    }
+    setState({
+      ...state,
+      trendParams,
+    });
   }, [state.selectedPoints]);
 
   useEffect(() => {
-    if (state.componentDidMount && historicalChartData) {
-      const chart = chartRef.current.chart;
-      const series = chart.series[0];
-      series.setData(historicalChartData, true);
+    if (state.componentDidMount && historicalChartSeries) {
+      updateChartHistoricalSeries({
+        chart: chartRef.current.chart,
+        series: historicalChartSeries,
+      });
     }
-  }, [historicalChartData, state.componentDidMount]);
+  }, [historicalChartSeries, state.componentDidMount]);
 
   useEffect(() => {
-    if (state.componentDidMount) {
-      const chart = chartRef.current.chart;
-      const series = chart.series[1];
-      series.setData(lineChartData, true);
+    if (state.componentDidMount && rectangleChartSeries) {
+      updateChartRectangleSeries({
+        chart: chartRef.current.chart,
+        series: rectangleChartSeries,
+      });
     }
-  }, [lineChartData, state.componentDidMount]);
+  }, [rectangleChartSeries, state.componentDidMount]);
+
+  useEffect(() => {
+    if (state.componentDidMount && trendChartSeries) {
+      updateChartTrendSeries({
+        chart: chartRef.current.chart,
+        series: trendChartSeries,
+      });
+    }
+  }, [trendChartSeries, state.componentDidMount]);
 
   useEffect(() => {
     const timestampTo = Date.now();
