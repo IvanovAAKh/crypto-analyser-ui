@@ -124,7 +124,7 @@ const calculateTrend = ({
   predictionTimestampTo,
 }) => {
   const iterationsCount = 200;
-  const threshold = 2;
+  const threshold = 1;
   const height = Math.abs(yEnd - yStart);
   const aMin = -(height * threshold) + height;
   const aMax = height * threshold;

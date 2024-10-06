@@ -7,6 +7,7 @@ import requestsHistoricalData from '../requests/historicalData';
 import useLocationSearch from 'misc/hooks/useLocationSearch';
 import useTheme from 'misc/hooks/useTheme';
 import Button from 'components/Button';
+import Checkbox from 'components/Checkbox';
 import Select from 'components/Select';
 import MenuItem from 'components/MenuItem';
 import TextField from 'components/TextField';
@@ -16,6 +17,10 @@ import dataUtils from '../utils/data';
 import trendUtils from '../utils/trend';
 
 const getClasses = createUseStyles((theme) => ({
+  checkboxContainer: {
+    alignItems: 'center',
+    display: 'flex',
+  },
   container: {
     display: 'flex',
     flexDirection: 'column',
@@ -87,6 +92,22 @@ const historicalDataIndexesToFields = {
 const defaultTrendProlongation = {
   timeMeasure: TIME_MEASURES.hours,
   value: 6,
+};
+
+const stringHashToColor = (str) => {
+  // Преобразуем строку в числовой хеш
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  // Используем три последних байта для RGB-каналов
+  const r = (hash >> 16) & 0xFF;
+  const g = (hash >> 8) & 0xFF;
+  const b = hash & 0xFF;
+
+  // Формируем строку с цветом в формате #RRGGBB
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 };
 
 const timeMeasureToTimestamp = ({
@@ -202,38 +223,100 @@ const buildHistoricalChartSeries = ({
 };
 
 const buildRectangleChartSeries = ({
-  trendParams,
+  trends,
 }) => {
-  if (!trendParams) {
+  if (!trends) {
     return [];
   }
+  return trends.reduce((acc, trend) => {
+    const {
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
+    } = trend.params;
+    acc.push([xStart, yStart]);
+    acc.push([xStart, yEnd]);
+    acc.push([xEnd, yEnd]);
+    acc.push([xEnd, yStart]);
+    acc.push([xStart, yStart]);
+    acc.push([null, null]);
+    return acc;
+  }, []);
+};
+
+const buildTrendChartSeries = ({
+  trends,
+}) => {
+  if (!trends) {
+    return [];
+  }
+  return trends.reduce((acc, trend) => {
+    trend.result.forEach(item => {
+      acc.push([item.xStart, item.yStart]);
+      acc.push([item.xEnd, item.yEnd]);
+      acc.push([null, null]);
+    });
+    return acc;
+  }, []);
+};
+
+const getTrendPeriodId = (trendPeriod) => `${trendPeriod.timeMeasure}_${trendPeriod.value}`;
+
+const createTrend = ({
+  historicalData,
+  period,
+  predictionTimestampTo,
+}) => {
+  const isFull = !period;
+  let pointA;
+  let pointB;
+  if (isFull) {
+    pointA = { x: historicalData[0].timestamp };
+    pointB = { x: historicalData.at(-1).timestamp };
+  } else {
+    const timestampTo = Date.now();
+    const timestampFrom = getTimestampBefore({
+      currentTimestamp: timestampTo,
+      timeMeasure: period.timeMeasure,
+      value: period.value,
+      withMillis: true,
+    });
+    pointA = { x: timestampFrom };
+    pointB = { x: timestampTo };
+  }
+  const selectedPoints = [pointA, pointB];
+  const params = {
+    period,
+    ...buildTrendParams({
+      selectedPoints,
+      historicalData,
+    }),
+  };
   const {
     xStart,
     xEnd,
     yStart,
     yEnd,
-  } = trendParams;
-  return [
-    [xStart, yStart],
-    [xStart, yEnd],
-    [xEnd, yEnd],
-    [xEnd, yStart],
-    [xStart, yStart],
-  ];
-};
+  } = params;
 
-const buildTrendChartSeries = ({
-  trend,
-}) => {
-  if (!trend) {
-    return [];
-  }
-  return trend.reduce((acc, item) => {
-    acc.push([item.xStart, item.yStart]);
-    acc.push([item.xEnd, item.yEnd]);
-    acc.push([null, null]);
-    return acc;
-  }, []);
+  const result = trendUtils.calculateTrend({
+    data: dataUtils.getDataInterval({
+      data: historicalData,
+      timestampFrom: xStart,
+      timestampTo: xEnd,
+    }),
+    predictionTimestampTo,
+    xStart,
+    xEnd,
+    yStart,
+    yEnd,
+  });
+
+  return {
+    params,
+    result,
+  };
 };
 
 function HistoricalData() {
@@ -261,8 +344,36 @@ function HistoricalData() {
   const [state, setState] = useState({
     componentDidMount: false,
     selectedPoints: [],
-    trendParams: null,
-    trend: null,
+    availableTrendPeriods: [
+      {
+        timeMeasure: TIME_MEASURES.days,
+        value: 4,
+      },
+      {
+        timeMeasure: TIME_MEASURES.days,
+        value: 2,
+      },
+      {
+        timeMeasure: TIME_MEASURES.days,
+        value: 1,
+      },
+      {
+        timeMeasure: TIME_MEASURES.hours,
+        value: 12,
+      },
+      {
+        timeMeasure: TIME_MEASURES.hours,
+        value: 6,
+      },
+      {
+        timeMeasure: TIME_MEASURES.hours,
+        value: 3,
+      },
+    ].map(trendPeriod => ({
+      ...trendPeriod,
+      id: getTrendPeriodId(trendPeriod),
+    })),
+    appliedTrends: [],
     trendProlongation: defaultTrendProlongation,
   });
 
@@ -319,7 +430,7 @@ function HistoricalData() {
       ...state,
       trendProlongation: {
         ...state.trendProlongation,
-        value: +value,
+        value,
       },
     });
   };
@@ -353,63 +464,34 @@ function HistoricalData() {
       });
       return ({
         ...prevState,
+        appliedTrends: [],
         selectedPoints: newSelectedPoints,
       });
     });
   };
 
-  const calculateTrendBySelected = () => {
-    const {
-      xStart,
-      xEnd,
-      yStart,
-      yEnd,
-    } = state.trendParams;
-    const trend = trendUtils.calculateTrend({
-      data: dataUtils.getDataInterval({
-        data: historicalData.list,
-        timestampFrom: xStart,
-        timestampTo: xEnd,
-      }),
-      predictionTimestampTo: xEnd + timeMeasureToTimestamp({
-        timeMeasure: state.trendProlongation.timeMeasure,
-        value: state.trendProlongation.value,
-      }),
-      xStart,
-      xEnd,
-      yStart,
-      yEnd,
-    });
+  const onSelectTrendPeriod = (trendPeriod) => {
+    const appliedTrendPeriodIds = state.appliedTrends
+      .map(trend => trend.params.period?.id);
+    const appliedTrends = appliedTrendPeriodIds.includes(trendPeriod.id)
+      ? state.appliedTrends.filter(trend => trend.params.period.id !== trendPeriod.id)
+      : state.appliedTrends.concat(createTrend({
+          historicalData: historicalData.list,
+          period: trendPeriod,
+          predictionTimestampTo: Date.now() + timeMeasureToTimestamp({
+            timeMeasure: state.trendProlongation.timeMeasure,
+            value: state.trendProlongation.value,
+          }),
+        }));
     setState({
       ...state,
-      trend,
+      appliedTrends,
     });
   };
 
-  const calculateTrendByTimeMeasure = ({
-    timeMeasure,
-    value,
-  }) => {
-    const isFull = !timeMeasure;
-    let pointA;
-    let pointB;
-    if (isFull) {
-      pointA = { x: historicalData.list[0].timestamp };
-      pointB = { x: historicalData.list.at(-1).timestamp };
-    } else {
-      const timestampTo = Date.now();
-      const timestampFrom = getTimestampBefore({
-        currentTimestamp: timestampTo,
-        timeMeasure,
-        value,
-        withMillis: true,
-      });
-      pointA = { x: timestampFrom };
-      pointB = { x: timestampTo };
-    }
-    const selectedPoints = [pointA, pointB];
+  const onCalculateTrendBySelectedPoints = () => {
     const trendParams = buildTrendParams({
-      selectedPoints,
+      selectedPoints: state.selectedPoints,
       historicalData: historicalData.list,
     });
     const {
@@ -418,13 +500,13 @@ function HistoricalData() {
       yStart,
       yEnd,
     } = trendParams;
-    const trend = trendUtils.calculateTrend({
+    const trendResult = trendUtils.calculateTrend({
       data: dataUtils.getDataInterval({
         data: historicalData.list,
         timestampFrom: xStart,
         timestampTo: xEnd,
       }),
-      predictionTimestampTo: xEnd + timeMeasureToTimestamp({
+      predictionTimestampTo: Date.now() + timeMeasureToTimestamp({
         timeMeasure: state.trendProlongation.timeMeasure,
         value: state.trendProlongation.value,
       }),
@@ -435,8 +517,10 @@ function HistoricalData() {
     });
     setState({
       ...state,
-      trend,
-      trendParams,
+      appliedTrends: state.appliedTrends.concat({
+        params: trendParams,
+        result: trendResult,
+      }),
     });
   };
 
@@ -663,32 +747,17 @@ function HistoricalData() {
 
   const trendChartSeries = useMemo(
     () => buildTrendChartSeries({
-      trend: state.trend,
+      trends: state.appliedTrends,
     }),
-    [state.trend],
+    [state.appliedTrends],
   );
 
   const rectangleChartSeries = useMemo(
     () => buildRectangleChartSeries({
-      trendParams: state.trendParams,
+      trends: state.appliedTrends,
     }),
-    [state.trendParams],
+    [state.appliedTrends],
   );
-
-  useEffect(() => {
-    let trendParams = null;
-    if (state.selectedPoints.length === 2) {
-      trendParams = buildTrendParams({
-        selectedPoints: state.selectedPoints,
-        historicalData: historicalData.list,
-      });
-    }
-    setState({
-      ...state,
-      trendParams,
-      trend: null,
-    });
-  }, [state.selectedPoints]);
 
   useEffect(() => {
     if (state.componentDidMount && historicalChartSeries) {
@@ -774,57 +843,28 @@ function HistoricalData() {
         </Typography>
         <Button
           disabled={state.selectedPoints.length < 2}
-          onClick={calculateTrendBySelected}
+          onClick={onCalculateTrendBySelectedPoints}
         >
           By selected
         </Button>
-        <Button
-          onClick={() => calculateTrendByTimeMeasure({})}
-        >
-          Full data
-        </Button>
-        <Button
-          onClick={() => calculateTrendByTimeMeasure({
-            timeMeasure: TIME_MEASURES.days,
-            value: 3,
-          })}
-        >
-          3 Days
-        </Button>
-        <Button
-          onClick={() => calculateTrendByTimeMeasure({
-            timeMeasure: TIME_MEASURES.days,
-            value: 1,
-          })}
-        >
-          1 Days
-        </Button>
-        <Button
-          onClick={() => calculateTrendByTimeMeasure({
-            timeMeasure: TIME_MEASURES.hours,
-            value: 12,
-          })}
-        >
-          12 Hours
-        </Button>
-        <Button
-          onClick={() => calculateTrendByTimeMeasure({
-            timeMeasure: TIME_MEASURES.hours,
-            value: 6,
-          })}
-        >
-          6 Hours
-        </Button>
-      </div>
-      <div>
-        {state.trend && (
-          <div>
-            {`Confidence: ${state.trend
-              .map(item => item.confidencePercent.toFixed(2) + '%')
-              .join(', ')
-            }`}
+        {state.availableTrendPeriods.map(trendPeriod => (
+          <div className={classes.checkboxContainer}>
+            <Checkbox
+              checked={state.appliedTrends
+                .some(trend => trend.params.period?.id === trendPeriod.id)}
+              onChange={() => onSelectTrendPeriod(trendPeriod)}
+            />
+            <Typography>
+              {`${trendPeriod.value} ${trendPeriod.timeMeasure} (${
+                  state.appliedTrends
+                    .find(trend => trend.params.period?.id === trendPeriod.id)
+                    ?.result
+                    ?.map(item => item.confidencePercent.toFixed(2)+'%')
+                    ?.join(', ')
+                })`}
+            </Typography>
           </div>
-        )}
+        ))}
       </div>
       <div
         style={{
