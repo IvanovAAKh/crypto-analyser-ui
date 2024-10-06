@@ -7,6 +7,10 @@ import requestsHistoricalData from '../requests/historicalData';
 import useLocationSearch from 'misc/hooks/useLocationSearch';
 import useTheme from 'misc/hooks/useTheme';
 import Button from 'components/Button';
+import Select from 'components/Select';
+import MenuItem from 'components/MenuItem';
+import TextField from 'components/TextField';
+import Typography from 'components/Typography';
 
 import dataUtils from '../utils/data';
 import trendUtils from '../utils/trend';
@@ -20,7 +24,15 @@ const getClasses = createUseStyles((theme) => ({
   },
   input: {
     width: '300px',
-  }
+  },
+  inputSmall: {
+    width: '100px',
+  },
+  toolbar: {
+    alignItems: 'center',
+    display: 'flex',
+    gap: `${theme.spacing(1)}px`,
+  },
 }));
 
 const pointColors = {
@@ -72,15 +84,40 @@ const historicalDataIndexesToFields = {
   [historicalDataFields.timestamp]: 0,
 };
 
+const defaultTrendProlongation = {
+  timeMeasure: TIME_MEASURES.hours,
+  value: 6,
+};
+
+const timeMeasureToTimestamp = ({
+  timeMeasure,
+  value,
+  withMillis = true,
+}) => {
+  const converter = minutesConvertersToTimeMeasures[timeMeasure];
+  const minutes = converter(value);
+  return minutes * 60 * (withMillis ? 1000 : 1);
+};
+
 const getTimestampBefore = ({
   currentTimestamp,
   timeMeasure,
   value,
   withMillis = false,
 }) => {
-  const converter = minutesConvertersToTimeMeasures[timeMeasure];
-  const minutesBefore = converter(value);
-  return currentTimestamp - minutesBefore * 60 * (withMillis ? 1000: 1);
+  return currentTimestamp - timeMeasureToTimestamp({
+    timeMeasure,
+    value,
+    withMillis,
+  });
+};
+
+const updateChartSeries = ({
+  oldSeries,
+  newSeries,
+}) => {
+  oldSeries.setData([], true);
+  oldSeries.setData(newSeries, true);
 };
 
 const updateChartHistoricalSeries = ({
@@ -88,7 +125,10 @@ const updateChartHistoricalSeries = ({
   series: newSeries,
 }) => {
   const series = chart.series[0];
-  series.setData(newSeries, true);
+  updateChartSeries({
+    oldSeries: series,
+    newSeries,
+  })
 };
 
 const updateChartRectangleSeries = ({
@@ -96,7 +136,10 @@ const updateChartRectangleSeries = ({
   series: newSeries,
 }) => {
   const series = chart.series[1];
-  series.setData(newSeries, true);
+  updateChartSeries({
+    oldSeries: series,
+    newSeries,
+  })
 };
 
 const updateChartTrendSeries = ({
@@ -104,7 +147,10 @@ const updateChartTrendSeries = ({
   series: newSeries,
 }) => {
   const series = chart.series[2];
-  series.setData(newSeries, true);
+  updateChartSeries({
+    oldSeries: series,
+    newSeries,
+  })
 };
 
 const buildTrendParams = ({
@@ -182,10 +228,12 @@ const buildTrendChartSeries = ({
   if (!trend) {
     return [];
   }
-  return [
-    [trend.xStart, trend.yStart],
-    [trend.xEnd, trend.yEnd],
-  ];
+  return trend.reduce((acc, item) => {
+    acc.push([item.xStart, item.yStart]);
+    acc.push([item.xEnd, item.yEnd]);
+    acc.push([null, null]);
+    return acc;
+  }, []);
 };
 
 function HistoricalData() {
@@ -215,6 +263,7 @@ function HistoricalData() {
     selectedPoints: [],
     trendParams: null,
     trend: null,
+    trendProlongation: defaultTrendProlongation,
   });
 
   const fetchBinanceHistoricalData = ({
@@ -255,6 +304,26 @@ function HistoricalData() {
     });
   };
 
+  const setProlongationMeasure = (timeMeasure) => {
+    setState({
+      ...state,
+      trendProlongation: {
+        ...state.trendProlongation,
+        timeMeasure,
+      },
+    });
+  };
+
+  const setProlongationValue = (value) => {
+    setState({
+      ...state,
+      trendProlongation: {
+        ...state.trendProlongation,
+        value: +value,
+      },
+    });
+  };
+
   const onClickPoint = (inputPoint) => {
     setState((prevState) => {
       const selectedPointIds = prevState.selectedPoints.map(point => point.x);
@@ -289,7 +358,7 @@ function HistoricalData() {
     });
   };
 
-  const calculateTrend = () => {
+  const calculateTrendBySelected = () => {
     const {
       xStart,
       xEnd,
@@ -302,6 +371,10 @@ function HistoricalData() {
         timestampFrom: xStart,
         timestampTo: xEnd,
       }),
+      predictionTimestampTo: xEnd + timeMeasureToTimestamp({
+        timeMeasure: state.trendProlongation.timeMeasure,
+        value: state.trendProlongation.value,
+      }),
       xStart,
       xEnd,
       yStart,
@@ -310,6 +383,60 @@ function HistoricalData() {
     setState({
       ...state,
       trend,
+    });
+  };
+
+  const calculateTrendByTimeMeasure = ({
+    timeMeasure,
+    value,
+  }) => {
+    const isFull = !timeMeasure;
+    let pointA;
+    let pointB;
+    if (isFull) {
+      pointA = { x: historicalData.list[0].timestamp };
+      pointB = { x: historicalData.list.at(-1).timestamp };
+    } else {
+      const timestampTo = Date.now();
+      const timestampFrom = getTimestampBefore({
+        currentTimestamp: timestampTo,
+        timeMeasure,
+        value,
+        withMillis: true,
+      });
+      pointA = { x: timestampFrom };
+      pointB = { x: timestampTo };
+    }
+    const selectedPoints = [pointA, pointB];
+    const trendParams = buildTrendParams({
+      selectedPoints,
+      historicalData: historicalData.list,
+    });
+    const {
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
+    } = trendParams;
+    const trend = trendUtils.calculateTrend({
+      data: dataUtils.getDataInterval({
+        data: historicalData.list,
+        timestampFrom: xStart,
+        timestampTo: xEnd,
+      }),
+      predictionTimestampTo: xEnd + timeMeasureToTimestamp({
+        timeMeasure: state.trendProlongation.timeMeasure,
+        value: state.trendProlongation.value,
+      }),
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
+    });
+    setState({
+      ...state,
+      trend,
+      trendParams,
     });
   };
 
@@ -620,18 +747,82 @@ function HistoricalData() {
 
   return (
     <div className={classes.container}>
-      <div className={classes.input}>
-        <Button
-          disabled={!state.trendParams}
-          onClick={calculateTrend}
+      <div className={classes.toolbar}>
+        <div className={classes.inputSmall}>
+          <TextField
+            inputType="number"
+            label="Value"
+            onChange={({ target }) => setProlongationValue(target.value)}
+            value={state.trendProlongation.value}
+          />
+        </div>
+        <Select
+          onChange={({ target }) => setProlongationMeasure(target.value)}
+          value={state.trendProlongation.timeMeasure}
         >
-          Calculate Trend
+          {Object
+            .values(TIME_MEASURES)
+            .map((timeMeasure) => (
+              <MenuItem value={timeMeasure}>
+                {timeMeasure}
+              </MenuItem>
+            ))
+          }
+        </Select>
+        <Typography>
+          Calculate trends:
+        </Typography>
+        <Button
+          disabled={state.selectedPoints.length < 2}
+          onClick={calculateTrendBySelected}
+        >
+          By selected
+        </Button>
+        <Button
+          onClick={() => calculateTrendByTimeMeasure({})}
+        >
+          Full data
+        </Button>
+        <Button
+          onClick={() => calculateTrendByTimeMeasure({
+            timeMeasure: TIME_MEASURES.days,
+            value: 3,
+          })}
+        >
+          3 Days
+        </Button>
+        <Button
+          onClick={() => calculateTrendByTimeMeasure({
+            timeMeasure: TIME_MEASURES.days,
+            value: 1,
+          })}
+        >
+          1 Days
+        </Button>
+        <Button
+          onClick={() => calculateTrendByTimeMeasure({
+            timeMeasure: TIME_MEASURES.hours,
+            value: 12,
+          })}
+        >
+          12 Hours
+        </Button>
+        <Button
+          onClick={() => calculateTrendByTimeMeasure({
+            timeMeasure: TIME_MEASURES.hours,
+            value: 6,
+          })}
+        >
+          6 Hours
         </Button>
       </div>
       <div>
         {state.trend && (
           <div>
-            {`Confidence: ${state.trend.confidencePercent.toFixed(2)}%`}
+            {`Confidence: ${state.trend
+              .map(item => item.confidencePercent.toFixed(2) + '%')
+              .join(', ')
+            }`}
           </div>
         )}
       </div>
