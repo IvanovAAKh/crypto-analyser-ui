@@ -67,12 +67,14 @@ const fetchBinanceHistoricalData = ({
   onFailed = () => {},
   onRequest = () => {},
   onSuccess = () => {},
-  timestampFrom,
-  timestampTo,
+  timestampFrom: inputTimestampFrom,
+  timestampTo: inputTimestampTo,
 }) => {
   onRequest();
   const limitPoints = 1000;
   const oneMinuteAsTimestamp = 60 * 1000;
+  const timestampFrom = Math.floor(inputTimestampFrom / oneMinuteAsTimestamp) * oneMinuteAsTimestamp;
+  const timestampTo = Math.floor(inputTimestampTo / oneMinuteAsTimestamp) * oneMinuteAsTimestamp;
   const rangeInMinutes = (timestampTo - timestampFrom) / oneMinuteAsTimestamp;
   const desiredPointsCount = rangeInMinutes / aggregateInMinutes;
   const requestsCount = Math.ceil(desiredPointsCount / limitPoints);
@@ -83,8 +85,6 @@ const fetchBinanceHistoricalData = ({
     .map((requestIndex) => {
       const partialTimestampFrom = timestampFrom + (requestIndex * requestShiftForTimestampTo) + shiftForAvoidOverlap;
       const partialTimestampTo = partialTimestampFrom - shiftForAvoidOverlap + requestShiftForTimestampTo;
-      const dateFrom = new Date(partialTimestampFrom);
-      const dateTo = new Date(partialTimestampTo);
       return getBinanceHistoricalData({
         endTime: partialTimestampTo,
         interval: `${aggregateInMinutes}m`,
