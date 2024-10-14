@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const addAxiosInterceptors = () => {
   axios.interceptors.response.use(
-    (response) => response.data,
+    (response) => response?.data,
     (error) => {
-      throw error.response.data;
+      throw error.response?.data;
     }
   );
 };

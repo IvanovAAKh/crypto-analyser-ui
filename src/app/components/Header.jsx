@@ -62,8 +62,6 @@ function Header() {
       <div className={classes.content}>
         <div className={classes.toolBarContainerLeft}>
           <LeftNavBar />
-        </div>
-        <div className={classes.toolBarContainerRight}>
           {actualOrderedRightPanelItemTypes.map((itemType) => (
             <>
               {itemType === rightPanelItemTypes.PAGE_NAME && (
@@ -75,6 +73,12 @@ function Header() {
                   {currentPage}
                 </Typography>
               )}
+            </>
+          ))}
+        </div>
+        <div className={classes.toolBarContainerRight}>
+          {actualOrderedRightPanelItemTypes.map((itemType) => (
+            <>
               {itemType === rightPanelItemTypes.SEPARATOR && (
                 <Typography
                   color="paper"

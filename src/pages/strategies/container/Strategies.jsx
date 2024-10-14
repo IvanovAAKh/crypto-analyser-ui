@@ -1,10 +1,15 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import { createUseStyles } from 'react-jss';
-
 import requestsStrategies from '../requests/strategies';
-import useLocationSearch from 'misc/hooks/useLocationSearch';
 import useTheme from 'misc/hooks/useTheme';
 import Button from 'components/Button';
+import Card from 'components/Card';
+import CardActions from 'components/CardActions';
+import CardContent from 'components/CardContent';
+import CardTitle from 'components/CardTitle';
+import Dialog from 'components/Dialog';
+import IconButton from 'components/IconButton';
+import IconClose from 'components/icons/Close';
 import Select from 'components/Select';
 import MenuItem from 'components/MenuItem';
 import TextField from 'components/TextField';
@@ -16,6 +21,25 @@ const getClasses = createUseStyles((theme) => ({
     flexDirection: 'column',
     gap: `${theme.spacing(2)}px`,
     height: '100%',
+  },
+  dialogContentPairContainer: {
+    display: 'flex',
+    gap: `${theme.spacing(2)}px`,
+  },
+  dialogContentPairLeft: {
+    justifyContent: 'center',
+    display: 'flex',
+    flex: 1,
+    flexDirection: 'column',
+    gap: `${theme.spacing(1)}px`,
+  },
+  dialogContentPairRight: {
+    justifyContent: 'end',
+    display: 'flex',
+    flex: 1,
+    flexDirection: 'column',
+    gap: `${theme.spacing(1)}px`,
+    width: '100%',
   },
 }));
 
@@ -83,7 +107,8 @@ function Strategies() {
   });
 
   const [state, setState] = useState({
-
+    editableStrategy: null,
+    openEditDialog: false,
   });
 
   const fetchStrategies = () => {
@@ -127,6 +152,46 @@ function Strategies() {
       }),
     });
   };
+  
+  const onCancelEditStrategy = () => {
+    setState({
+      ...state,
+      editableStrategy: null,
+      openEditDialog: false,
+    });
+  };
+
+  const onStartCreateStrategy = () => {
+    setState({
+      ...state,
+      editableStrategy: {
+        ...state.editableStrategy,
+
+      },
+      openEditDialog: true,
+    })
+  };
+
+  const onChangeRectangleShiftRatio = (value) => {
+    setState({
+      ...state,
+      editableStrategy: {
+        ...state.editableStrategy,
+        trendsConfig: {
+          ...state.editableStrategy?.trendsConfig,
+          rectangleShiftRatio: value,
+        },
+      },
+    });
+  };
+
+  const onSaveStrategy = () => {
+    setState({
+      ...state,
+      editableStrategy: null,
+      openEditDialog: false,
+    })
+  };
 
   useEffect(() => {
     fetchStrategies();
@@ -135,7 +200,65 @@ function Strategies() {
 
   return (
     <div className={classes.container}>
-      huy
+      <div>
+        <Button onClick={onStartCreateStrategy}>
+          Create Strategy
+        </Button>
+      </div>
+      <Dialog open={state.openEditDialog}>
+        <Card variant="edit">
+          <CardTitle>
+            <Typography variant="title">
+              {state.editableStrategy?.id
+                ? 'Update Strategy'
+                : 'Create Strategy'}
+            </Typography>
+            <IconButton onClick={onCancelEditStrategy}>
+              <IconClose size={24} />
+            </IconButton>
+          </CardTitle>
+          <CardContent>
+            <Typography variant="subTitle">
+              <strong>
+                Конфигурация трендов:
+              </strong>
+            </Typography>
+            <div className={classes.dialogContentPairContainer}>
+              <div className={classes.dialogContentPairLeft}>
+                <Typography>
+                  - Множитель сдвига для a, b у прямоугольника тренда:
+                </Typography>
+              </div>
+              <div className={classes.dialogContentPairRight}>
+                <TextField
+                  inputType="number"
+                  onChange={({ target }) => onChangeRectangleShiftRatio(target.value)}
+                  value={state.editableStrategy?.trendsConfig?.rectangleShiftRatio}
+                />
+              </div>
+            </div>
+          </CardContent>
+          <CardActions>
+            <div>
+              <Button
+                colorVariant="secondary"
+                onClick={onCancelEditStrategy}
+                variant="secondary"
+              >
+                Cancel
+              </Button>
+            </div>
+            <div>
+              <Button
+                onClick={onSaveStrategy}
+                variant="primary"
+              >
+                Save
+              </Button>
+            </div>
+          </CardActions>
+        </Card>
+      </Dialog>
     </div>
   );
 }
