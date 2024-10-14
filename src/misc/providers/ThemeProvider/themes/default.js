@@ -13,9 +13,9 @@ const commonColors = {
     warning: '#E9A631',
   },
   background: {
-    primary: '#2d2d2b',
+    primary: '#ffffff',
     primaryHeader: '#161616',
-    secondary: '#e6e6e6',
+    secondary: '#ffffff',
     secondaryHeader: '#ddc8a7',
     tertiary: '#ddc8a7',
     tertiaryHeader: '#ddc8a7',
