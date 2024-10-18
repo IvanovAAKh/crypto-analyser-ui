@@ -172,6 +172,7 @@ const theme = {
       error: commonColors.text.error,
       info: commonColors.text.info,
       primary: commonColors.text.primary,
+      primaryContrast: commonColors.text.primaryContrast,
       secondary: commonColors.text.secondary,
       tertiary: commonColors.text.tertiary,
       success: commonColors.text.success,

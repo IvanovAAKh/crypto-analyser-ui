@@ -1,6 +1,6 @@
 import React from 'react';
 import AccordionMui from '@mui/material/Accordion';
-import useTheme from 'hooks/useTheme';
+import useTheme from 'misc/hooks/useTheme';
 
 const Accordion = ({
   expanded,

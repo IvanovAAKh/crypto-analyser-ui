@@ -1,7 +1,7 @@
 import { createUseStyles } from 'react-jss';
 import React from 'react';
 import AccordionSummaryMui from '@mui/material/AccordionSummary';
-import useTheme from 'hooks/useTheme';
+import useTheme from 'misc/hooks/useTheme';
 
 const getClasses = createUseStyles({
   paddingNone: {
@@ -15,7 +15,7 @@ const AccordionSummary = ({
   expandIcon,
 }) => {
   const { theme } = useTheme();
-  const { classes } = getClasses(theme);
+  const classes = getClasses({ theme });
   return (
     <AccordionSummaryMui
       className={disablePadding ? classes.paddingNone : ''}

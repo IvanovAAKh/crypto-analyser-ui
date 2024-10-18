@@ -1,63 +1,74 @@
-import React, { useState, useMemo } from 'react';
+import { createUseStyles } from 'react-jss';
+import React from 'react';
 import InputAdornmentMui from '@mui/material/InputAdornment';
 import TextFieldMui from '@mui/material/TextField';
-import Typography from '../Typography';
 import useTheme from 'misc/hooks/useTheme';
 
-const colorVariants = {
-  header: 'header',
-  primary: 'primary',
+const getClasses = createUseStyles((theme) => ({
+  caption: theme.typography.variants.caption,
+  default: theme.typography.variants.default,
+  input: {
+    '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+      display: 'none',
+    },
+    '& input[type=number]': {
+      MozAppearance: 'textfield',
+    },
+  },
+  subtitle: theme.typography.variants.subtitle,
+  title: theme.typography.variants.title,
+}));
+
+const positionOptions = {
+  BOTTOM: 'bottom',
+  CENTER: 'center',
+  TOP: 'top',
 };
 
-const inputTypes = {
-  password: 'password',
-  text: 'text',
+const adornmentPositionToFlexVariant = {
+  [positionOptions.BOTTOM]: 'flex-end',
+  [positionOptions.CENTER]: 'center',
+  [positionOptions.TOP]: 'flex-start',
 };
-
-const REQUIRED_CHAR = '*';
 
 const TextField = ({
   AdornmentStart,
   AdornmentEnd,
+  adornmentPosition = 'center', // 'top' | 'center' | 'bottom'
   autoFocus = false,
-  colorVariant = colorVariants.primary,
   disabled = false,
+  fullWidth = false,
   helperText,
-  inputType = inputTypes.text,
+  inputRef,
+  inputType = 'text',
   isError = false,
   label,
+  minRows,
   multiline = false,
   onBlur,
   onChange,
   onSelect,
-  required = false,
+  placeholder,
+  size, // 'medium' | 'small'
+  textVariant = 'default', // 'caption' | 'default' | 'subtitle' | 'title'
   value,
+  variant = 'standard', // 'filled' | 'outlined' | 'standard'
 }) => {
   const { theme } = useTheme();
-  const [ state, setState ] = useState({
-    isFocused: false,
-  });
-  const isEmptyValue = !value?.length;
-  const labelColor = useMemo(() => {
-    let color;
-    if (isError && !isEmptyValue) {
-      color = theme.colors.text.error;
-    } else if (state.isFocused || !isEmptyValue) {
-      color = theme.input.color[colorVariant].text.secondary;
-    } else {
-      color = theme.input.color[colorVariant].placeholder;
-    }
-    return color;
-  }, [isError, isEmptyValue, theme, state.isFocused]);
+  const classes = getClasses({ theme });
 
   return (
     <TextFieldMui
       autoFocus={autoFocus}
+      className={classes.input}
       disabled={disabled}
       error={isError}
-      fullWidth
+      fullWidth={fullWidth}
       helperText={helperText}
       InputProps={{
+        classes: {
+          input: classes[textVariant],
+        },
         endAdornment: AdornmentEnd && (
           <InputAdornmentMui position="end">
             {AdornmentEnd}
@@ -68,51 +79,20 @@ const TextField = ({
             {AdornmentStart}
           </InputAdornmentMui>
         ),
+        sx: { alignItems: adornmentPositionToFlexVariant[adornmentPosition] },
       }}
-      label={(
-        <Typography color={labelColor}>
-          {required ? `${REQUIRED_CHAR}${label}` : label}
-        </Typography>
-      )}
+      inputRef={inputRef}
+      label={label}
+      minRows={minRows}
       multiline={multiline}
-      onBlur={() => setState({
-        ...state,
-        isFocused: false,
-      })}
+      onBlur={onBlur}
       onChange={onChange}
-      onFocus={() => setState({
-        ...state,
-        isFocused: true,
-      })}
       onSelect={onSelect}
-      sx={{
-        '& .MuiInputBase-root:before': {
-          display: 'none',
-        },
-        '& .MuiInputBase-root:after': {
-          display: 'none',
-        },
-        '& .MuiInputBase-root': {
-          background: disabled && 'rgba(0, 0, 0, 0.05) !important',
-          borderBottom: `1px solid ${isError
-            ? theme.colors.text.error
-            : theme.input.color[colorVariant].border}`,
-          color: theme.input.color[colorVariant].text.primary,
-          opacity: disabled && '0.4',
-          marginTop: `${theme.spacing(1.5)}px`,
-          '&:hover': !disabled
-            ? {
-              marginBottom: '-0.5px !important',
-              borderBottom: `2px solid ${isError
-                ? theme.colors.text.error
-                : theme.input.color[colorVariant].border}`,
-            }
-            : {},
-        },
-      }}
+      placeholder={placeholder}
+      size={size}
       type={inputType}
       value={value}
-      variant="standard"
+      variant={variant}
     />
   );
 };

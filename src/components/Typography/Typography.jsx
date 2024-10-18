@@ -25,7 +25,7 @@ const colors = {
 const variants = {
   caption: 'caption',
   default: 'default',
-  subTitle: 'subTitle',
+  subtitle: 'subtitle',
   title: 'title'
 };
 
