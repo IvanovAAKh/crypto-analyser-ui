@@ -13,7 +13,7 @@ const Accordion = ({
       expanded={expanded}
       onChange={onChange}
       sx={{
-        backgroundColor: theme.card.background.paper,
+        backgroundColor: theme.colors.background.tertiary,
       }}
     >
       {children}

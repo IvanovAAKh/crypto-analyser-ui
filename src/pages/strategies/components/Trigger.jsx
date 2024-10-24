@@ -6,6 +6,8 @@ import Select from 'components/Select';
 import TextField from 'components/TextField';
 import Typography from 'components/Typography';
 
+import Operand from './Operand';
+
 const getClasses = createUseStyles((theme) => ({
   container: {
     display: 'flex',
@@ -34,17 +36,19 @@ const getClasses = createUseStyles((theme) => ({
 function Trigger({
   onChange,
   possibleDataSourceTypes,
+  possibleDataValueTypes,
   possibleOperationTypes,
   possibleOperators,
   trigger,
 }) {
   const { theme } = useTheme();
   const classes = getClasses({ theme });
+  console.log(trigger);
 
-  const onChangeExpectedValue = (value) => {
+  const onChangeExpectedResult = (value) => {
     onChange({
       ...trigger,
-      expectedValue: value,
+      expectedResult: value,
     });
   };
 
@@ -62,10 +66,17 @@ function Trigger({
     });
   };
 
-  const onChangeDataSourceType = (value) => {
+  const onChangeOperandA = (value) => {
     onChange({
       ...trigger,
-      dataSourceType: value,
+      operandA: value,
+    });
+  };
+
+  const onChangeOperandB = (value) => {
+    onChange({
+      ...trigger,
+      operandB: value,
     });
   };
 
@@ -74,20 +85,16 @@ function Trigger({
       <div className={classes.contentPairContainer}>
         <div className={classes.contentPairLeft}>
           <Typography>
-            Источник информации:
+            Операнд А:
           </Typography>
         </div>
         <div className={classes.contentPairRight}>
-          <Select
-            onChange={({ target }) => onChangeDataSourceType(target.value)}
-            value={trigger.dataSourceType}
-          >
-            {Object.values(possibleDataSourceTypes).map(dataSourceType => (
-              <MenuItem value={dataSourceType}>
-                {dataSourceType}
-              </MenuItem>
-            ))}
-          </Select>
+          <Operand
+            onChange={onChangeOperandA}
+            operand={trigger.operandA}
+            possibleDataSourceTypes={possibleDataSourceTypes}
+            possibleDataValueTypes={possibleDataValueTypes}
+          />
         </div>
       </div>
       <div className={classes.contentPairContainer}>
@@ -107,6 +114,21 @@ function Trigger({
               </MenuItem>
             ))}
           </Select>
+        </div>
+      </div>
+      <div className={classes.contentPairContainer}>
+        <div className={classes.contentPairLeft}>
+          <Typography>
+            Операнд Б:
+          </Typography>
+        </div>
+        <div className={classes.contentPairRight}>
+          <Operand
+            onChange={onChangeOperandB}
+            operand={trigger.operandB}
+            possibleDataSourceTypes={possibleDataSourceTypes}
+            possibleDataValueTypes={possibleDataValueTypes}
+          />
         </div>
       </div>
       <div className={classes.contentPairContainer}>
@@ -135,10 +157,11 @@ function Trigger({
           </Typography>
         </div>
         <div className={classes.contentPairRight}>
-          <TextField
-            inputType="number"
-            onChange={({ target }) => onChangeExpectedValue(target.value)}
-            value={trigger.expectedValue}
+          <Operand
+            onChange={onChangeExpectedResult}
+            operand={trigger.expectedResult}
+            possibleDataSourceTypes={possibleDataSourceTypes}
+            possibleDataValueTypes={possibleDataValueTypes}
           />
         </div>
       </div>

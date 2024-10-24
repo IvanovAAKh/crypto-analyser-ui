@@ -2,6 +2,9 @@ import React, {useEffect, useState} from 'react';
 import { createUseStyles } from 'react-jss';
 import requestsStrategies from '../requests/strategies';
 import useTheme from 'misc/hooks/useTheme';
+import Accordion from 'components/Accordion';
+import AccordionDetails from 'components/AccordionDetails';
+import AccordionSummary from 'components/AccordionSummary';
 import Button from 'components/Button';
 import Card from 'components/Card';
 import CardActions from 'components/CardActions';
@@ -11,6 +14,7 @@ import Dialog from 'components/Dialog';
 import IconButton from 'components/IconButton';
 import IconClose from 'components/icons/Close';
 import IconDelete from 'components/icons/Delete';
+import IconEdit from 'components/icons/Edit';
 import TextField from 'components/TextField';
 import Typography from 'components/Typography';
 
@@ -18,6 +22,22 @@ import Trend from '../components/Trend';
 import TriggerAndAction from '../components/TriggerAndAction';
 
 const getClasses = createUseStyles((theme) => ({
+  accordionSummaryContainer: {
+    alignItems: 'center',
+    display: 'flex',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  accordionSummaryActionsContainer: {
+    display: 'flex',
+    gap: `${theme.spacing(1)}px`,
+    justifyContent: 'end',
+  },
+  accordionSummaryTitleContainer: {
+    display: 'flex',
+    gap: `${theme.spacing(1)}px`,
+    width: '100%',
+  },
   container: {
     display: 'flex',
     flexDirection: 'column',
@@ -87,10 +107,47 @@ const strategiesToUI = (strategiesBE) => {
       triggersOR: item.triggersOR.map(triggerOR => ({
         triggersAND: triggerOR.triggersAND.map(triggerAND => ({
           comment: triggerAND.comment,
-          expectedValue: triggerAND.expectedValue,
+          operandA: {
+            byDataSource: !!triggerAND.operandA.byDataSource
+              ? {
+                type: triggerAND.operandA.byDataSource.type,
+              }
+              : null,
+            byValue: !!triggerAND.operandA.byValue
+              ? {
+                value: triggerAND.operandA.byValue.value,
+                type: triggerAND.operandA.byValue.type,
+              }
+              : null,
+          },
+          operandB: {
+            byDataSource: !!triggerAND.operandB.byDataSource
+              ? {
+                type: triggerAND.operandB.byDataSource.type,
+              }
+              : null,
+            byValue: !!triggerAND.operandB.byValue
+              ? {
+                value: triggerAND.operandB.byValue.value,
+                type: triggerAND.operandB.byValue.type,
+              }
+              : null,
+          },
+          expectedResult: {
+            byDataSource: !!triggerAND.expectedResult.byDataSource
+              ? {
+                type: triggerAND.expectedResult.byDataSource.type,
+              }
+              : null,
+            byValue: !!triggerAND.expectedResult.byValue
+              ? {
+                value: triggerAND.expectedResult.byValue.value,
+                type: triggerAND.expectedResult.byValue.type,
+              }
+              : null,
+          },
           operationType: triggerAND.operationType,
           operator: triggerAND.operator,
-          dataSourceType: triggerAND.dataSourceType,
         })),
       })),
     })),
@@ -102,6 +159,7 @@ const possibleValuesToUI = (possibleValuesBE) => {
     actionTypes: possibleValuesBE.actionTypes,
     behaviorTypes: possibleValuesBE.behaviorTypes,
     dataSourceTypes: possibleValuesBE.dataSourceTypes,
+    dataValueTypes: possibleValuesBE.dataValueTypes,
     measures: possibleValuesBE.measures,
     operationTypes: possibleValuesBE.operationTypes,
     operators: possibleValuesBE.operators,
@@ -135,6 +193,7 @@ function Strategies() {
   const [state, setState] = useState({
     componentDidMount: false,
     editableStrategy: null,
+    expandedStrategyIds: [],
     openEditDialog: false,
   });
 
@@ -212,6 +271,7 @@ function Strategies() {
             : prev.list.concat(convertedStrategy)
         }));
       },
+      id: strategyToSave.id,
       name: strategyToSave.name,
       trendsConfig: strategyToSave.trendsConfig,
       triggersAndActions: strategyToSave.triggersAndActions,
@@ -251,17 +311,35 @@ function Strategies() {
           comment: '',
           triggersOR: [{
             triggersAND: [{
-              comment: '',
-              expectedValue: null,
+              comment: "",
+              operandA: {
+                byDataSource: null,
+                byValue: null,
+              },
+              operandB: {
+                byDataSource: null,
+                byValue: null,
+              },
+              expectedResult: {
+                byDataSource: null,
+                byValue: null,
+              },
               operationType: null,
               operator: null,
-              dataSourceType: null,
             }],
           }]
         }]
       },
       openEditDialog: true,
     })
+  };
+
+  const onStartEditStrategy = (strategy) => {
+    setState({
+      ...state,
+      editableStrategy: {...strategy},
+      openEditDialog: true,
+    });
   };
 
   const onChangeName = (value) => {
@@ -384,10 +462,20 @@ function Strategies() {
             triggersOR: [{
               triggersAND: [{
                 comment: '',
-                expectedValue: null,
+                operandA: {
+                  byDataSource: null,
+                  byValue: null,
+                },
+                operandB: {
+                  byDataSource: null,
+                  byValue: null,
+                },
+                expectedResult: {
+                  byDataSource: null,
+                  byValue: null,
+                },
                 operationType: null,
                 operator: null,
-                dataSourceType: null,
               }],
             }],
           }),
@@ -403,6 +491,15 @@ function Strategies() {
         triggersAndActions: state.editableStrategy.triggersAndActions
           .filter((_, index) => index !== inputIndex),
       },
+    });
+  };
+
+  const onExpandStrategy = (strategyId) => {
+    setState({
+      ...state,
+      expandedStrategyIds: state.expandedStrategyIds.includes(strategyId)
+        ? state.expandedStrategyIds.filter(id => id !== strategyId)
+        : state.expandedStrategyIds.concat(strategyId),
     });
   };
 
@@ -442,11 +539,36 @@ function Strategies() {
           Create Strategy
         </Button>
       </div>
-      {(strategies.list || []).map(strategy => (
-        <Typography>
-          {strategy.name}
-        </Typography>
-      ))}
+      <div>
+        {(strategies.list || []).map(strategy => (
+          <Accordion
+            expanded={state.expandedStrategyIds.includes(strategy.id)}
+            onChange={() => onExpandStrategy(strategy.id)}
+          >
+            <AccordionSummary>
+              <div className={classes.accordionSummaryContainer}>
+                <div className={classes.accordionSummaryTitleContainer}>
+                  <Typography variant="subtitle">
+                    {strategy.name}
+                  </Typography>
+                </div>
+                <div className={classes.accordionSummaryActionsContainer}>
+                  <IconButton
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onStartEditStrategy(strategy);
+                    }}
+                  >
+                    <IconEdit />
+                  </IconButton>
+                </div>
+              </div>
+            </AccordionSummary>
+            <AccordionDetails>
+            </AccordionDetails>
+          </Accordion>
+        ))}
+      </div>
       <Dialog open={state.openEditDialog}>
         <Card variant="edit">
           <CardTitle>
@@ -597,6 +719,7 @@ function Strategies() {
                               possibleActionTypes={possibleValues.data.actionTypes}
                               possibleBehaviorTypes={possibleValues.data.behaviorTypes}
                               possibleDataSourceTypes={possibleValues.data.dataSourceTypes}
+                              possibleDataValueTypes={possibleValues.data.dataValueTypes}
                               possibleOperationTypes={possibleValues.data.operationTypes}
                               possibleOperators={possibleValues.data.operators}
                               triggerAndAction={triggerAndAction}

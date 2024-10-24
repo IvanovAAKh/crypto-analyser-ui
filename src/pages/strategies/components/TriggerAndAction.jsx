@@ -81,6 +81,7 @@ function TriggerAndAction({
   possibleActionTypes,
   possibleBehaviorTypes,
   possibleDataSourceTypes,
+  possibleDataValueTypes,
   possibleOperationTypes,
   possibleOperators,
   triggerAndAction,
@@ -94,10 +95,20 @@ function TriggerAndAction({
       triggersOR: triggerAndAction.triggersOR.concat({
         triggersAND: [{
           comment: '',
-          expectedValue: null,
+          operandA: {
+            byDataSource: null,
+            byValue: null,
+          },
+          operandB: {
+            byDataSource: null,
+            byValue: null,
+          },
+          expectedResult: {
+            byDataSource: null,
+            byValue: null,
+          },
           operationType: null,
           operator: null,
-          dataSourceType: null,
         }],
       }),
     });
@@ -112,10 +123,20 @@ function TriggerAndAction({
             ...triggerOR,
             triggersAND: triggerOR.triggersAND.concat({
               comment: '',
-              expectedValue: null,
+              operandA: {
+                byDataSource: null,
+                byValue: null,
+              },
+              operandB: {
+                byDataSource: null,
+                byValue: null,
+              },
+              expectedResult: {
+                byDataSource: null,
+                byValue: null,
+              },
               operationType: null,
               operator: null,
-              dataSourceType: null,
             }),
           })
           : triggerOR
@@ -276,6 +297,7 @@ function TriggerAndAction({
                                   trigger: changedTrigger,
                                 })}
                                 possibleDataSourceTypes={possibleDataSourceTypes}
+                                possibleDataValueTypes={possibleDataValueTypes}
                                 possibleOperationTypes={possibleOperationTypes}
                                 possibleOperators={possibleOperators}
                                 trigger={triggerAND}

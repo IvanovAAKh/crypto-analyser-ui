@@ -17,6 +17,7 @@ const Select = ({
   children,
   fullHeight = true,
   fullWidth = false,
+  label,
   multiple = false,
   onChange,
   renderValue,
@@ -34,6 +35,7 @@ const Select = ({
           sx: { maxHeight: fullHeight ? '100%' : '300px' },
         },
       }}
+      label={label}
       multiple={multiple}
       onChange={onChange}
       renderValue={renderValue}
