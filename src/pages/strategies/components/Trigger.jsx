@@ -15,11 +15,12 @@ const getClasses = createUseStyles((theme) => ({
     gap: `${theme.spacing(1)}px`,
   },
   contentPairContainer: {
+    alignItems: 'end',
     display: 'flex',
     gap: `${theme.spacing(2)}px`,
+    height: '48px',
   },
   contentPairLeft: {
-    justifyContent: 'center',
     display: 'flex',
     flex: 1,
     flexDirection: 'column',
@@ -43,7 +44,6 @@ function Trigger({
 }) {
   const { theme } = useTheme();
   const classes = getClasses({ theme });
-  console.log(trigger);
 
   const onChangeExpectedResult = (value) => {
     onChange({
@@ -80,8 +80,29 @@ function Trigger({
     });
   };
 
+  const onChangeTrendIndex = (value) => {
+    onChange({
+      ...trigger,
+      trendIndex: value,
+    });
+  };
+
   return (
     <div className={classes.container}>
+      <div className={classes.contentPairContainer}>
+        <div className={classes.contentPairLeft}>
+          <Typography>
+            Тренд индекс:
+          </Typography>
+        </div>
+        <div className={classes.contentPairRight}>
+          <TextField
+            inputType="number"
+            onChange={({ target }) => onChangeTrendIndex(target.value)}
+            value={trigger.trendIndex}
+          />
+        </div>
+      </div>
       <div className={classes.contentPairContainer}>
         <div className={classes.contentPairLeft}>
           <Typography>

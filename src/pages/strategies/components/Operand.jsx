@@ -7,7 +7,7 @@ import TextField from 'components/TextField';
 
 const getClasses = createUseStyles((theme) => ({
   container: {
-    alignItems: 'center',
+    alignItems: 'end',
     display: 'flex',
     gap: `${theme.spacing(1)}px`,
   },

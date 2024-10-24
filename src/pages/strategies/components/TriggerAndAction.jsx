@@ -42,7 +42,7 @@ const getClasses = createUseStyles((theme) => ({
     display: 'flex',
     justifyContent: 'center',
     padding: `${theme.spacing(1)}px ${theme.spacing(2)}px`,
-    background: theme.colors.background.tertiary,
+    background: '#60a5d8',
   },
   dividerANDLabelContainer: {
     alignItems: 'center',
@@ -50,7 +50,7 @@ const getClasses = createUseStyles((theme) => ({
     display: 'flex',
     justifyContent: 'center',
     padding: `${theme.spacing(1)}px ${theme.spacing(2)}px`,
-    background: theme.colors.background.tertiary,
+    background: '#ee6c6c',
   },
   verticalCenter: {
     alignItems: 'center',

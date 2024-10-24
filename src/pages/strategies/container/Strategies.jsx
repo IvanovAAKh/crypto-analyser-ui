@@ -148,6 +148,7 @@ const strategiesToUI = (strategiesBE) => {
           },
           operationType: triggerAND.operationType,
           operator: triggerAND.operator,
+          trendIndex: triggerAND.trendIndex,
         })),
       })),
     })),
@@ -326,6 +327,7 @@ function Strategies() {
               },
               operationType: null,
               operator: null,
+              trendIndex: null,
             }],
           }]
         }]
@@ -476,6 +478,7 @@ function Strategies() {
                 },
                 operationType: null,
                 operator: null,
+                trendIndex: null,
               }],
             }],
           }),
