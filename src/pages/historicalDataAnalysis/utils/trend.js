@@ -159,6 +159,18 @@ const calculateTrend = ({
   }
   const confidencePercent = bestIntersectionsCount / data.length * 100;
   const trend = [];
+  trend.push(shiftTrend({
+    confidencePercent,
+    direction: SHIFT_DIRECTIONS.down,
+    data,
+    a: bestA,
+    b: bestB,
+    step: step / 2,
+    xStart,
+    xEnd,
+    yStart,
+    yEnd,
+  }));
   trend.push({
     a: bestA,
     b: bestB,
@@ -180,24 +192,14 @@ const calculateTrend = ({
     yStart,
     yEnd,
   }));
-  trend.push(shiftTrend({
-    confidencePercent,
-    direction: SHIFT_DIRECTIONS.down,
-    data,
-    a: bestA,
-    b: bestB,
-    step: step / 2,
-    xStart,
-    xEnd,
-    yStart,
-    yEnd,
-  }));
-  return trend.map(item => prolongateTrend({
-    timestampTo: predictionTimestampTo,
-    trend: item,
-    yStart,
-    yEnd,
-  }));
+  return predictionTimestampTo
+    ? trend.map(item => prolongateTrend({
+      timestampTo: predictionTimestampTo,
+      trend: item,
+      yStart,
+      yEnd,
+    }))
+    : trend;
 };
 
 export default {

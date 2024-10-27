@@ -808,7 +808,6 @@ function HistoricalData() {
   ]);
 
   useEffect(() => {
-    requestsHistoricalData.fetchTrades();
     setState({
       ...state,
       componentDidMount: true,

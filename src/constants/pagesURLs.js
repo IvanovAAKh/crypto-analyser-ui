@@ -5,6 +5,7 @@ const result = {
   [pages.defaultPage]: `${config.UI_URL_PREFIX}/${pages.defaultPage}`,
   [pages.historicalData]: `${config.UI_URL_PREFIX}/${pages.historicalData}`,
   [pages.strategies]: `${config.UI_URL_PREFIX}/${pages.strategies}`,
+  [pages.strategySimulation]: `${config.UI_URL_PREFIX}/${pages.strategySimulation}`,
 };
 
 export default result;

@@ -8,6 +8,7 @@ import { addAxiosInterceptors } from 'misc/requests';
 import ThemeProvider from 'misc/providers/ThemeProvider';
 import HistoricalDataAnalysis from 'pageProviders/HistoricalDataAnalysis';
 import Strategies from 'pageProviders/Strategies';
+import StrategySimulation from 'pageProviders/StrategySimulation';
 import * as pages from 'constants/pages';
 import pageURLs from 'constants/pagesURLs';
 
@@ -47,6 +48,10 @@ function App() {
               <Route
                 element={<Strategies />}
                 path={`${pageURLs[pages.strategies]}`}
+              />
+              <Route
+                element={<StrategySimulation />}
+                path={`${pageURLs[pages.strategySimulation]}`}
               />
               <Route
                 element={(

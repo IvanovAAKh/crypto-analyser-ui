@@ -5,7 +5,7 @@ import IconMenu from 'components/icons/Menu';
 import Link from 'components/Link';
 import MenuItem from 'components/MenuItem';
 import pagesURLs from 'constants/pagesURLs';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import SwipeableDrawer from 'components/SwipeableDrawer';
 import Typography from 'components/Typography';
 import useTheme from 'misc/hooks/useTheme';
@@ -27,6 +27,11 @@ const menuItems = [
     link: `${pagesURLs[pages.strategies]}`,
     title: `Strategies`,
   },
+  {
+    icon: <></>,
+    link: `${pagesURLs[pages.strategySimulation]}`,
+    title: `Strategy Simulation`,
+  },
 ];
 
 function LeftNavBar() {
@@ -41,7 +46,7 @@ function LeftNavBar() {
     isNavMenuOpened: false,
   });
 
-  const filteredItems = menuItems
+  const filteredItems = menuItems;
 
   if (!filteredItems.length) {
     return;
