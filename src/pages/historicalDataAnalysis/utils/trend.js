@@ -123,7 +123,7 @@ const calculateTrend = ({
   yEnd,
   predictionTimestampTo,
 }) => {
-  const iterationsCount = 200;
+  const iterationsCount = 100;
   const threshold = 1;
   const height = Math.abs(yEnd - yStart);
   const aMin = -(height * threshold) + height;
@@ -158,8 +158,7 @@ const calculateTrend = ({
     currentB = bMin;
   }
   const confidencePercent = bestIntersectionsCount / data.length * 100;
-  const trend = [];
-  trend.push(shiftTrend({
+  const trendDown = shiftTrend({
     confidencePercent,
     direction: SHIFT_DIRECTIONS.down,
     data,
@@ -170,8 +169,8 @@ const calculateTrend = ({
     xEnd,
     yStart,
     yEnd,
-  }));
-  trend.push({
+  });
+  const trendMiddle = {
     a: bestA,
     b: bestB,
     confidencePercent,
@@ -179,8 +178,8 @@ const calculateTrend = ({
     xEnd,
     yStart: bestA + yStart,
     yEnd: bestB + yStart,
-  });
-  trend.push(shiftTrend({
+  };
+  const trendUp = shiftTrend({
     confidencePercent,
     direction: SHIFT_DIRECTIONS.up,
     data,
@@ -191,6 +190,11 @@ const calculateTrend = ({
     xEnd,
     yStart,
     yEnd,
+  });
+  const anglePercent = (bestB - bestA) * 100 / (aMax - aMin);
+  const trend = [trendDown, trendMiddle, trendUp].map(trendPart => ({
+    ...trendPart,
+    anglePercent,
   }));
   return predictionTimestampTo
     ? trend.map(item => prolongateTrend({

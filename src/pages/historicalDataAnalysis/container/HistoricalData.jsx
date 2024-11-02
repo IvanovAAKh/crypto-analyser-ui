@@ -506,15 +506,16 @@ function HistoricalData() {
         timestampFrom: xStart,
         timestampTo: xEnd,
       }),
-      predictionTimestampTo: Date.now() + timeMeasureToTimestamp({
-        timeMeasure: state.trendProlongation.timeMeasure,
-        value: state.trendProlongation.value,
-      }),
+      // predictionTimestampTo: Date.now() + timeMeasureToTimestamp({
+      //   timeMeasure: state.trendProlongation.timeMeasure,
+      //   value: state.trendProlongation.value,
+      // }),
       xStart,
       xEnd,
       yStart,
       yEnd,
     });
+    console.log(trendResult);
     setState({
       ...state,
       appliedTrends: state.appliedTrends.concat({
@@ -789,7 +790,7 @@ function HistoricalData() {
   useEffect(() => {
     const timestampTo = Date.now();
     fetchBinanceHistoricalData({
-      aggregateInMinutes: 1,
+      aggregateInMinutes: 15,
       currencyFrom: historicalDataParams.currencyFrom,
       currencyTo: historicalDataParams.currencyTo,
       timestampTo,

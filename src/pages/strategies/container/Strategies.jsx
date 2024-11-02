@@ -14,6 +14,7 @@ import Dialog from 'components/Dialog';
 import IconButton from 'components/IconButton';
 import IconClose from 'components/icons/Close';
 import IconDelete from 'components/icons/Delete';
+import IconDuplicate from 'components/icons/Duplicate';
 import IconEdit from 'components/icons/Edit';
 import TextField from 'components/TextField';
 import Typography from 'components/Typography';
@@ -486,6 +487,25 @@ function Strategies() {
     });
   };
 
+  const onDuplicateTrigger = (inputIndex) => {
+    const triggersAndActions = state.editableStrategy.triggersAndActions
+      .reduce((acc, item, index) => {
+        acc.push(item);
+        if (index === inputIndex) {
+          const duplicate = {...item};
+          acc.push(duplicate);
+        }
+        return acc;
+      }, []);
+    setState({
+      ...state,
+      editableStrategy: {
+        ...state.editableStrategy,
+        triggersAndActions,
+      },
+    });
+  };
+
   const onDeleteTrigger = (inputIndex) => {
     setState({
       ...state,
@@ -709,6 +729,9 @@ function Strategies() {
                                 value={triggerAndAction.comment}
                               />
                             </div>
+                            <IconButton onClick={()=> onDuplicateTrigger(index)}>
+                              <IconDuplicate size={24} />
+                            </IconButton>
                             <IconButton onClick={()=> onDeleteTrigger(index)}>
                               <IconDelete size={24} />
                             </IconButton>
