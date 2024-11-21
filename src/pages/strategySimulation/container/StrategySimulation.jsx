@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import { createUseStyles } from 'react-jss';
+import requestsHistoricalData from '../requests/historicalData';
 import requestsStrategies from '../requests/strategies';
 import requestsSimulation from '../requests/simulation';
 import useTheme from 'misc/hooks/useTheme';
@@ -7,6 +8,8 @@ import Button from 'components/Button';
 import MenuItem from 'components/MenuItem';
 import Select from 'components/Select';
 import TextField from 'components/TextField';
+
+import Chart from '../components/Chart';
 
 const getClasses = createUseStyles((theme) => ({
   container: {
@@ -27,6 +30,17 @@ const getClasses = createUseStyles((theme) => ({
   },
 }));
 
+const historicalDataBinanceToUI = (response) => {
+  const list = response.map(([timestamp, open, high, low, close]) => ({
+    high: Number(high),
+    close: Number(close),
+    low: Number(low),
+    open: Number(open),
+    timestamp,
+  }));
+  return list;
+};
+
 const strategiesToUI = (strategiesBE) => {
   return strategiesBE.map(strategy => ({
     id: strategy.id,
@@ -35,7 +49,7 @@ const strategiesToUI = (strategiesBE) => {
 };
 
 const simulationResultToUI = (result) => {
-  return result;
+  return result.transactionsHistory;
 };
 
 const daysToTimestamp = (days) => days * 24 * 60 * 60 * 1000;
@@ -58,6 +72,13 @@ function StrategySimulation() {
     isFetching: false,
   });
 
+  const [historicalData, setHistoricalData] = useState({
+    data: null,
+    errorMsg: '',
+    isFailed: false,
+    isFetching: false,
+  });
+
   const [state, setState] = useState({
     componentDidMount: false,
     requestParams: {
@@ -66,6 +87,7 @@ function StrategySimulation() {
       simulationIntervalInDays: 30,
       startMoney: 500,
       strategyId: null,
+      timestampTo: Date.now(),
     },
   });
 
@@ -91,10 +113,8 @@ function StrategySimulation() {
   };
 
   const fetchStartSimulation = () => {
-    const timestampTo = Date.now();
-    const timestampFrom = timestampTo - daysToTimestamp(state.requestParams
+    const timestampFrom = state.requestParams.timestampTo - daysToTimestamp(state.requestParams
       .simulationIntervalInDays);
-    console.log(timestampFrom, timestampTo);
     requestsSimulation.startSimulation({
       onFailed: (error) => setSimulationResult({
         ...simulationResult,
@@ -117,23 +137,60 @@ function StrategySimulation() {
       startMoney: state.requestParams.startMoney,
       strategyId: state.requestParams.strategyId,
       timestampFrom,
-      timestampTo,
+      timestampTo: state.requestParams.timestampTo,
+    });
+  };
+
+  const fetchHistoricalData = () => {
+    const timestampFrom = state.requestParams.timestampTo - daysToTimestamp(state.requestParams
+      .simulationIntervalInDays);
+    requestsHistoricalData.fetchBinanceHistoricalData({
+      aggregateInMinutes: 15,
+      currencyFrom: state.requestParams.currencyFrom,
+      currencyTo: state.requestParams.currencyTo,
+      timestampFrom,
+      timestampTo: state.requestParams.timestampTo,
+      onFailed: (error) => setHistoricalData({
+        ...historicalData,
+        errorMsg: error,
+        isFailed: true,
+        isFetching: false,
+      }),
+      onRequest: () => setHistoricalData({
+        ...historicalData,
+        isFailed: false,
+        isFetching: true,
+      }),
+      onSuccess: (result) => setHistoricalData({
+        ...historicalData,
+        isFetching: false,
+        data: historicalDataBinanceToUI(result),
+      }),
     });
   };
 
   const onSetRequestParam = (params) => {
-    setState({
-      ...state,
+    setState(prevState => ({
+      ...prevState,
       requestParams: {
-        ...state.requestParams,
+        ...prevState.requestParams,
         ...params,
       },
-    })
+    }));
   };
 
   const onSimulate = () => {
     fetchStartSimulation();
+    fetchHistoricalData();
   };
+
+  useEffect(() => {
+    if (strategies.list?.length) {
+      onSetRequestParam({
+        strategyId: strategies.list[0].id,
+      });
+    }
+  }, [strategies.list]);
 
   useEffect(() => {
     fetchStrategies();
@@ -193,6 +250,10 @@ function StrategySimulation() {
           Simulate
         </Button>
       </div>
+      <Chart
+        historicalData={historicalData.data}
+        simulationData={simulationResult.data}
+      />
     </div>
   );
 }
