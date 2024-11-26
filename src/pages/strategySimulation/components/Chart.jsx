@@ -5,6 +5,9 @@ import HighchartsReact from 'highcharts-react-official';
 
 import useTheme from 'misc/hooks/useTheme';
 
+import timeUtils, { TIME_MEASURES } from '../utils/time';
+import trendUtils from '../utils/trend';
+
 const getClasses = createUseStyles((theme) => ({
   container: {
     display: 'flex',
@@ -17,7 +20,8 @@ const getClasses = createUseStyles((theme) => ({
 const chartNames = {
   historicalData: 'Historical Data',
   transactions: 'Transactions',
-  trend: 'Trend',
+  simulationDataPointTrend: 'Simulation Data Point Trend',
+  customTrend: 'Custom Trend',
 };
 
 const pointColors = {
@@ -74,11 +78,22 @@ const updateChartSimulationPointsSeries = ({
   })
 };
 
-const updateChartSimulationTrendSeries = ({
+const updateChartSimulationPointTrendSeries = ({
   chart,
   series: newSeries,
 }) => {
   const series = chart.series[2];
+  updateChartSeries({
+    oldSeries: series,
+    newSeries,
+  })
+};
+
+const updateChartCustomPointTrendSeries = ({
+  chart,
+  series: newSeries,
+}) => {
+  const series = chart.series[3];
   updateChartSeries({
     oldSeries: series,
     newSeries,
@@ -117,10 +132,11 @@ const buildSimulationPointsChartSeries = ({
       : 'red',
     walletCurrency: item.wallet.currency,
     walletMoney: item.wallet.money,
+    walletReserve: item.wallet.reserve,
   }));
 };
 
-const buildSimulationTrendChartSeries = ({
+const buildSimulationPointTrendChartSeries = ({
   simulationDataPoint,
 }) => {
   if (!simulationDataPoint) {
@@ -137,9 +153,77 @@ const buildSimulationTrendChartSeries = ({
     }, []);
 };
 
+const buildZipTrendChartSeries = ({
+  dataPoint,
+  historicalData,
+  timeBefore = {
+    value: 1,
+    measure: TIME_MEASURES.days,
+  },
+  zipPartsCount = 6,
+}) => {
+  if (!dataPoint || !historicalData) {
+    return [];
+  }
+  const timestampTo = dataPoint.timestamp;
+  const timestampFrom = timeUtils.getTimestampBefore({
+    currentTimestamp: timestampTo,
+    timeMeasure: timeBefore.measure,
+    value: timeBefore.value,
+    withMillis: true,
+  });
+  const dataPart = historicalData
+    .filter(item => item.timestamp >= timestampFrom && item.timestamp <= timestampTo);
+  const zipTrends = trendUtils.buildZipTrends({
+    data: dataPart,
+    piecesCount: zipPartsCount,
+  });
+  return zipTrends.reduce((acc, trend) => {
+    trend.forEach(item => {
+      acc.push([item.xStart, item.yStart]);
+      acc.push([item.xEnd, item.yEnd]);
+      acc.push([null, null]);
+    });
+    return acc;
+  }, []);
+};
+
+const buildStrategyTrendChartSeries = ({
+  dataPoint,
+  historicalData,
+  strategy,
+}) => {
+  if (!dataPoint || !historicalData) {
+    return [];
+  }
+  const timestampTo = dataPoint.timestamp;
+  const trends = strategy.trendsConfig.trends.map(trend => {
+    const timestampFrom = timeUtils.getTimestampBefore({
+      currentTimestamp: timestampTo,
+      timeMeasure: trend.measure,
+      value: trend.value,
+      withMillis: true,
+    });
+    const dataPart = historicalData
+      .filter(item => item.timestamp >= timestampFrom && item.timestamp <= timestampTo);
+    return trendUtils.buildTrend({
+      data: dataPart,
+    });
+  });
+  return trends.reduce((acc, trend) => {
+    trend.forEach(item => {
+      acc.push([item.xStart, item.yStart]);
+      acc.push([item.xEnd, item.yEnd]);
+      acc.push([null, null]);
+    });
+    return acc;
+  }, []);
+};
+
 const Chart = ({
   historicalData,
   simulationData,
+  strategy,
 }) => {
   const chartRef = useRef(null);
   const containerRef = useRef(null);
@@ -148,6 +232,7 @@ const Chart = ({
   const [state, setState] = useState({
     componentDidMount: false,
     clickedSimulationDataPoint: null,
+    clickedHistoricalDataPoint: null,
   });
 
   const handleSimulationDataPointClick = ({
@@ -155,20 +240,31 @@ const Chart = ({
     simulationData: inputSimulationData,
   }) => {
     const foundItem = inputSimulationData.find(item => item.state.currentTimestamp === point.x);
+    console.log(foundItem);
     setState(prevState => ({
       ...prevState,
       clickedSimulationDataPoint: foundItem,
     }))
   };
 
+  const handleHistoricalDataPointClick = ({
+    point,
+    historicalData: inputHistoricalData,
+  }) => {
+    const foundItem = inputHistoricalData.find(item => item.timestamp === point.x);
+    setState(prevState => ({
+      ...prevState,
+      clickedHistoricalDataPoint: foundItem,
+    }));
+  };
+
   const onClickChartArea = useCallback(function() {
-    if (this.hoverPoint) {
-      handleSimulationDataPointClick({
-        point: this.hoverPoint,
-        simulationData,
-      });
-    }
-  }, [simulationData]);
+    setState(prevState => ({
+      ...prevState,
+      clickedHistoricalDataPoint: null,
+      clickedSimulationDataPoint: null,
+    }));
+  }, [simulationData, historicalData]);
 
   const onClickSimulationDataPoint = useCallback(function() {
     handleSimulationDataPointClick({
@@ -176,6 +272,13 @@ const Chart = ({
       simulationData,
     });
   }, [simulationData]);
+
+  const onClickHistoricalDataPoint = useCallback(function() {
+    handleHistoricalDataPointClick({
+      point: this,
+      historicalData,
+    });
+  }, [historicalData]);
 
   const chart = useMemo(() => {
     if (!state.componentDidMount) {
@@ -200,6 +303,11 @@ const Chart = ({
       },
       time: {
         timezone: 'Europe/Kiev',
+      },
+      plotOptions: {
+        series: {
+          stickyTracking: false, // Убираем область захвата тултипа
+        },
       },
       tooltip: {
         formatter: function () {
@@ -232,11 +340,16 @@ const Chart = ({
               '<br/>------------------------------------------' +
               `<br/>Money: <b>${Number(this.point.walletMoney.toFixed(ROUND_RATIO)).toLocaleString('ru-RU')}</b>` +
               `<br/>Currency: <b>${Number(this.point.walletCurrency.toFixed(ROUND_RATIO)).toLocaleString('ru-RU')}</b>` +
+              `<br/>Reserve: <b>${Number(this.point.walletReserve.toFixed(ROUND_RATIO)).toLocaleString('ru-RU')}</b>` +
+              `<br/>Total: <b>${Number((+this.point.walletReserve + +this.point.walletMoney).toFixed(ROUND_RATIO)).toLocaleString('ru-RU')}</b>` +
               '';
           }
           return result;
         },
+        hideDelay: 0,
         split: false,
+        shared: false, // Тултип не общий для всех точек
+        snap: 1
       },
       navigator: {
         enabled: false,
@@ -277,14 +390,12 @@ const Chart = ({
           crisp: false,
           dataGrouping: {
             enabled: true,
-            units: [
-              [
-                'minute',
-                [15],
-              ],
-            ],
           },
-          enableMouseTracking: false,
+          point: {
+            events: {
+              click: onClickHistoricalDataPoint,
+            },
+          },
           grouping: true,
           groupPadding: 0,
           lineWidth: 0.3,
@@ -322,7 +433,32 @@ const Chart = ({
           dataGrouping: {
             enabled: false,
           },
-          name: chartNames.trend,
+          name: chartNames.simulationDataPointTrend,
+          states: {
+            inactive: {
+              opacity: 1
+            },
+            hover: {
+              enabled: false // Отключает эффект при наведении
+            }
+          },
+          enableMouseTracking: false, // Отключает наведение
+          showInLegend: false, // Убирает из легенды
+          events: {
+            legendItemClick: function() {
+              return false; // Отключает клик в легенде (если она все же отображается)
+            }
+          },
+          marker: {
+            enabled: false // Отключает маркеры точек
+          }
+        },
+        {
+          type: 'line',
+          dataGrouping: {
+            enabled: false,
+          },
+          name: chartNames.customTrend,
           states: {
             inactive: {
               opacity: 1
@@ -344,7 +480,12 @@ const Chart = ({
         },
       ],
     };
-  }, [state.componentDidMount, onClickChartArea, onClickSimulationDataPoint]);
+  }, [
+    state.componentDidMount,
+    onClickChartArea,
+    onClickSimulationDataPoint,
+    onClickHistoricalDataPoint,
+  ]);
 
   const historicalChartSeries = useMemo(
     () =>  buildHistoricalChartSeries({
@@ -360,11 +501,34 @@ const Chart = ({
     [simulationData],
   );
 
-  const simulationTrendChartSeries = useMemo(
-    () => buildSimulationTrendChartSeries({
+  const simulationPointTrendChartSeries = useMemo(
+    () => buildSimulationPointTrendChartSeries({
       simulationDataPoint: state.clickedSimulationDataPoint,
     }),
     [state.clickedSimulationDataPoint],
+  );
+
+  const customPointTrendChartSeries = useMemo(
+    () => {
+      if (strategy) {
+        return buildStrategyTrendChartSeries({
+          dataPoint: state.clickedHistoricalDataPoint,
+          historicalData,
+          strategy,
+        });
+      } else {
+        return buildZipTrendChartSeries({
+          dataPoint: state.clickedHistoricalDataPoint,
+          historicalData,
+          timeBefore: {
+            measure: TIME_MEASURES.hours,
+            value: 4,
+          },
+          zipPartsCount: 1,
+        });
+      }
+    },
+    [state.clickedHistoricalDataPoint, historicalData, strategy],
   );
 
   useEffect(() => {
@@ -386,13 +550,22 @@ const Chart = ({
   }, [simulationPointsChartSeries, state.componentDidMount]);
 
   useEffect(() => {
-    if (state.componentDidMount && simulationTrendChartSeries) {
-      updateChartSimulationTrendSeries({
+    if (state.componentDidMount && simulationPointTrendChartSeries) {
+      updateChartSimulationPointTrendSeries({
         chart: chartRef.current.chart,
-        series: simulationTrendChartSeries,
+        series: simulationPointTrendChartSeries,
       });
     }
-  }, [simulationTrendChartSeries, state.componentDidMount]);
+  }, [simulationPointTrendChartSeries, state.componentDidMount]);
+
+  useEffect(() => {
+    if (state.componentDidMount && customPointTrendChartSeries) {
+      updateChartCustomPointTrendSeries({
+        chart: chartRef.current.chart,
+        series: customPointTrendChartSeries,
+      });
+    }
+  }, [customPointTrendChartSeries, state.componentDidMount]);
 
   useEffect(() => {
     setState(prevState => ({

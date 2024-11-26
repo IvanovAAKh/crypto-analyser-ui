@@ -206,7 +206,8 @@ const calculateTrend = ({
     : trend;
 };
 
-const splitArrayByPortions = (arr, portionLength) => {
+const splitArrayByPortions = (arr, portionsCount) => {
+  const portionLength = Math.ceil(arr.length / portionsCount);
   const portions = [];
   let portion = [];
   for(let i = arr.length - 1; i >= 0; i--) {
@@ -259,7 +260,22 @@ const buildZipTrends = ({
   return trends;
 };
 
+const buildTrend = ({
+  data,
+}) => {
+  const firstPoint = data[0];
+  const lastPoint = data.at(-1);
+  const minMaxPrices = getMinMaxPrices(data);
+  return calculateTrend({
+    data,
+    xStart: firstPoint.timestamp,
+    xEnd: lastPoint.timestamp,
+    yStart: minMaxPrices.min,
+    yEnd: minMaxPrices.max,
+  });
+};
+
 export default {
-  calculateTrend,
+  buildTrend,
   buildZipTrends,
 }

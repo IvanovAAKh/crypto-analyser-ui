@@ -49,7 +49,10 @@ const strategiesToUI = (strategiesBE) => {
 };
 
 const simulationResultToUI = (result) => {
-  return result.transactionsHistory;
+  return {
+    strategy: result.strategy,
+    transactionsHistory: result.transactionsHistory,
+  };
 };
 
 const daysToTimestamp = (days) => days * 24 * 60 * 60 * 1000;
@@ -82,12 +85,13 @@ function StrategySimulation() {
   const [state, setState] = useState({
     componentDidMount: false,
     requestParams: {
-      currencyFrom: 'BTC',
+      currencyFrom: 'SUI',
       currencyTo: 'USDT',
       simulationIntervalInDays: 30,
       startMoney: 500,
       strategyId: null,
-      timestampTo: Date.now(),
+      // timestampTo: Date.now(),
+      timestampTo: (new Date('08.07.2024')).getTime(),
     },
   });
 
@@ -185,14 +189,6 @@ function StrategySimulation() {
   };
 
   useEffect(() => {
-    if (strategies.list?.length) {
-      onSetRequestParam({
-        strategyId: strategies.list[0].id,
-      });
-    }
-  }, [strategies.list]);
-
-  useEffect(() => {
     fetchStrategies();
     setState(prevState => ({
       ...prevState,
@@ -226,6 +222,16 @@ function StrategySimulation() {
           value={state.requestParams.currencyTo}
         />
         <TextField
+          inputType="date"
+          label="Конечная Дата"
+          onChange={({ target }) => {
+            onSetRequestParam({
+              timestampTo: (new Date(target.value)).getTime(),
+            });
+          }}
+          value={(new Date(state.requestParams.timestampTo)).toISOString().split('T')[0]}
+        />
+        <TextField
           inputType="number"
           label="Интервал симуляции (в днях)"
           onChange={({ target }) => onSetRequestParam({
@@ -252,7 +258,8 @@ function StrategySimulation() {
       </div>
       <Chart
         historicalData={historicalData.data}
-        simulationData={simulationResult.data}
+        simulationData={simulationResult.data?.transactionsHistory}
+        strategy={simulationResult.data?.strategy}
       />
     </div>
   );
