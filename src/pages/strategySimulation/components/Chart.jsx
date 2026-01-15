@@ -126,10 +126,10 @@ const buildSimulationPointsChartSeries = ({
   return simulationData.map(item => ({
     x: item.state.currentTimestamp,
     y: item.state.currentPointPrice,
-    comment: item.triggerAndAction.comment,
-    color: item.triggerAndAction.action.actionType === 'buy'
-      ? 'green'
-      : 'red',
+    comment: item.action.comment,
+    color: item.action.type === 'buy'
+      ? `rgba(0, 150, 0, ${item.action.isRequested ? 0.3 : 1})`
+      : `rgba(255, 0, 0, ${item.action.isRequested ? 0.3 : 1})`,
     walletCurrency: item.wallet.currency,
     walletMoney: item.wallet.money,
     walletReserve: item.wallet.reserve,
@@ -210,6 +210,7 @@ const buildStrategyTrendChartSeries = ({
       data: dataPart,
     });
   });
+  console.log(trends);
   return trends.reduce((acc, trend) => {
     trend.forEach(item => {
       acc.push([item.xStart, item.yStart]);
@@ -458,6 +459,7 @@ const Chart = ({
           dataGrouping: {
             enabled: false,
           },
+          color: '#000000',
           name: chartNames.customTrend,
           states: {
             inactive: {
